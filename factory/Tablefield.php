@@ -127,7 +127,7 @@ class Tablefield {
     }
 
     private function setDataName($type = 'comment') {
-        $type = version_compare(PHP_VERSION, '5.6.0', '>') ? 'comment' : $type;
+        //$type = version_compare(PHP_VERSION, '5.6.0', '>') ? 'comment' : $type;
         if ($this->ofInt($this->dataType)) {
             return 'comment' != $type ? '' : 'int ';
         }

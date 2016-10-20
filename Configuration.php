@@ -14,10 +14,10 @@
 class Configuration {
 
     static $MODELS_DIRECTORY = 'models' . DIRECTORY_SEPARATOR;
-    static $DB_USERNAME = 'ictdev';
-    static $DB_NAME = 'redcap';
-    static $DB_PASS = 'ictP@ss';
-    static $DB_HOST = 'keklf-mysqluat';
+    static $DB_USERNAME = 'root';
+    static $DB_NAME = 'monitore_org';
+    static $DB_PASS = 'root';
+    static $DB_HOST = 'localhost';
     static $DB_SERVER = 'mysql';
     private static $DB_FOLDER = false;
 

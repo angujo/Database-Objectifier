@@ -19,6 +19,13 @@ class Table {
     public $comment = '';
     public $typeView = false;
 
+	/**
+	 * Table constructor.
+	 *
+	 * @param string $name
+	 * @param Tablefield[]  $fields
+	 * @param string $type
+	 */
     public function __construct($name = '', array $fields = array(), $type = '') {
         $this->name = $name;
         $this->typeView = 'view' == trim(strtolower($type));
@@ -26,6 +33,9 @@ class Table {
         $this->fields = $fields;
     }
 
+	/**
+	 * @return array|Tablefield[]
+	 */
     public function getFields() {
         return $this->fields;
     }
