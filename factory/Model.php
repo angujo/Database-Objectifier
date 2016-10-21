@@ -59,8 +59,8 @@ class Model
 			$str .= PHP_EOL . Configuration::TAB . ' */' . PHP_EOL;
 			$str .= Configuration::TAB . 'public function set' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $field->name))) . '(' .
 			        $field->argDataTypeName . '$' . $field->name . '){' . PHP_EOL;
-			$str .= Configuration::TAB . Configuration::TAB . '$this->' . $field->name . ' = ' . $field->constDefaultValue . ';' . PHP_EOL;
-			$str .= Configuration::TAB . Configuration::TAB . 'return $this;' . PHP_EOL;
+			$str .= Configuration::TAB(2) . '$this->' . $field->name . ' = ' . $field->constDefaultValue . ';' . PHP_EOL;
+			$str .= Configuration::TAB(2) . 'return $this;' . PHP_EOL;
 			$str .= Configuration::TAB . '}' . PHP_EOL;
 			$this->editModel($str);
 		}
@@ -75,7 +75,7 @@ class Model
 			$str .= PHP_EOL . Configuration::TAB . ' */' . PHP_EOL;
 			$str .= Configuration::TAB . 'public function get' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $field->name))) . '(){' .
 			        PHP_EOL;
-			$str .= Configuration::TAB . Configuration::TAB . 'return $this->' . $field->name . ';' . PHP_EOL;
+			$str .= Configuration::TAB(2) . 'return $this->' . $field->name . ';' . PHP_EOL;
 			$str .= Configuration::TAB . '}' . PHP_EOL;
 			$this->editModel($str);
 		}
@@ -92,7 +92,7 @@ class Model
 				$args[]                        = $field->argDataTypeName . '$' . $field->name . " = " . $field->varDefaultValue;
 				$arguments['$' . $field->name] = $field->argDataTypeName . '$' . $field->name . " = " . $field->varDefaultValue;
 				$instances[]                   =
-					Configuration::TAB . Configuration::TAB . '$this->' . $field->name . ' = ' . $field->constDefaultValue . ';';
+					Configuration::TAB(2) . '$this->' . $field->name . ' = ' . $field->constDefaultValue . ';';
 			}
 		}
 		$str =
@@ -113,8 +113,8 @@ class Model
 		if (file_exists($dir . $this->table->model . '.php')) {
 			unlink($dir . $this->table->model . '.php');
 		}
-		$str = '<?php ' . PHP_EOL . PHP_EOL . 'namespace Database\\' . Configuration::dbNamespace() . ';'. PHP_EOL .
-		       PHP_EOL . 'use Database;'. PHP_EOL .
+		$str = '<?php ' . PHP_EOL . PHP_EOL . 'namespace Database\\' . Configuration::dbNamespace() . ';' . PHP_EOL .
+		       PHP_EOL . 'use Database;' . PHP_EOL .
 		       PHP_EOL . 'class ' . $this->table->model . ' extends Database\ModelAction{' . PHP_EOL . PHP_EOL;
 		$str .= Configuration::TAB . 'CONST TABLE_NAME = \'' . $this->table->name . '\';' . PHP_EOL;
 		file_put_contents($dir . $this->table->model . '.php', $str . PHP_EOL, FILE_APPEND | LOCK_EX);
@@ -122,7 +122,14 @@ class Model
 
 	private function closeModel()
 	{
-		$str = '}' . PHP_EOL;
+		$str = '}' . PHP_EOL . PHP_EOL.
+		       '/*' . PHP_EOL .
+		       ' * --------------------------DON\'T REMOVE THIS------------------------- ' . PHP_EOL .
+		       ' * End of Class ' . $this->table->model . PHP_EOL .
+		       ' * DbObjectofier developed by angujo ' . PHP_EOL .
+		       ' * Tweet at @angujomondi ' . PHP_EOL .
+		       ' * Generated: ' . date('Y-m-d H:i:s T') . PHP_EOL .
+		       ' */' . PHP_EOL;
 		$this->editModel($str);
 	}
 

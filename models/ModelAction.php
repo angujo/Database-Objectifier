@@ -7,16 +7,17 @@ namespace Database;
  * Date: 19-Oct-16
  * Time: 7:27 PM
  */
-class ModelAction
+class ModelAction extends \Dbobjectifier
 {
-	protected $DB = NULL;
+	//protected $DB = NULL;
 	CONST TABLE_NAME = '';
 	public $id = FALSE;
 
 	function __construct()
 	{
+		parent::__construct();
 		$object = get_class($this);
-		if (static::TABLE_NAME) {
+		if (!static::TABLE_NAME) {
 			throw new \Exception($object . ' IS MISSING TABLE!');
 		}
 		if (!isset($this->id) || FALSE === $this->id) {
@@ -29,10 +30,10 @@ class ModelAction
 	{
 		$table = static::TABLE_NAME;
 		if ($this->id) {
-			$this->update($table);
+			return $this->update($table);
 		} else {
 			unset($this->id);
-			$this->insert($table);
+			return $this->insert($table);
 		}
 	}
 
@@ -54,8 +55,7 @@ class ModelAction
 	{
 		if (is_array($conditions)) {
 			$conditions = array_filter($conditions, function ($k) {
-				$k = trim($k);
-				return strlen($k) > 0 && ctype_digit(substr($k, 0, 1));
+				return strlen($k) > 0 && !ctype_digit(substr($k, 0, 1));
 			}, ARRAY_FILTER_USE_KEY);
 			$found      = FALSE;
 			foreach ($conditions as $column => $value) {
@@ -86,7 +86,7 @@ class ModelAction
 		if (is_array($conditions)) {
 			$conditions = array_filter($conditions, function ($k) {
 				$k = trim($k);
-				return strlen($k) > 0 && ctype_digit(substr($k, 0, 1));
+				return strlen($k) > 0 && !ctype_digit(substr($k, 0, 1));
 			}, ARRAY_FILTER_USE_KEY);
 			$found      = FALSE;
 			foreach ($conditions as $column => $value) {
@@ -113,7 +113,7 @@ class ModelAction
 	{
 		$this->DB->insert($table, $this);
 		$this->id = $this->DB->insert_id();
-		return $this;
+		return (bool)$this->id;
 	}
 
 	private function update($table)
@@ -123,7 +123,7 @@ class ModelAction
 		unset($this->id);
 		$this->DB->update($table, $this);
 		$this->id = $id;
-		return $this;
+		return (bool)$this->DB->affected_rows();
 	}
 
 	function init(array $data)
@@ -132,6 +132,7 @@ class ModelAction
 			if (!trim($column)) continue;
 			if (isset($this->{$column})) $this->{$column} = $value;
 		}
+		return $this;
 	}
 
 	function __call($name, $arguments)
@@ -141,6 +142,11 @@ class ModelAction
 		}
 		if (isset($this->{$name})) return $this->{$name};
 		throw new \Exception('Invalid call to method : ' . $name . '! METHOD DOES NOT EXIST!');
+	}
+
+	function lastQuery()
+	{
+		return $this->DB->last_query();
 	}
 }
 

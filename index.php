@@ -18,11 +18,11 @@ require_once 'Dbobjectifier.php';
 $path = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'models'.DIRECTORY_SEPARATOR.'monitoreorg';
 $dirs = glob($path . DIRECTORY_SEPARATOR . '*.{php}', GLOB_BRACE);
 echo '<pre>';
-var_dump($dirs);
+//var_dump($dirs);
 
 //var_dump(PHP_VERSION);
 
 var_dump(version_compare(PHP_VERSION, '5.6.0', '>'));
 $obj = new Dbobjectifier(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'models' . DIRECTORY_SEPARATOR);
 
-//$obj->generate();
+$obj->generate();

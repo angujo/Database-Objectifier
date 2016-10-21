@@ -54,7 +54,14 @@ class Extension
 
 	private function closeExtension()
 	{
-		$str = '}' . PHP_EOL;
+		$str = '}' . PHP_EOL . PHP_EOL .
+		       '/*' . PHP_EOL .
+		       ' * --------------------------DON\'T REMOVE THIS------------------------- ' . PHP_EOL .
+		       ' * End of Class ' . $this->extensionName . PHP_EOL .
+		       ' * DbObjectofier developed by angujo ' . PHP_EOL .
+		       ' * Tweet at @angujomondi ' . PHP_EOL .
+		       ' * Generated: ' . date('Y-m-d H:i:s T') . PHP_EOL .
+		       ' */' . PHP_EOL;
 		$this->editExtension($str);
 	}
 
@@ -70,7 +77,7 @@ class Extension
 	private function createConstructor()
 	{
 		$str = Configuration::TAB . 'function __constructor(' . implode(', ', $this->constructorArgs) . '){' . PHP_EOL .
-		       Configuration::TAB . Configuration::TAB . 'parent::__constructor(' . implode(', ', array_keys($this->constructorArgs)) . ');' .
+		       Configuration::TAB(2) . 'parent::__constructor(' . implode(', ', array_keys($this->constructorArgs)) . ');' .
 		       PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
 		$this->editExtension($str);
 	}
@@ -92,27 +99,64 @@ class Extension
 		$this->functions[$tblModel] = TRUE;
 		if (empty($joins)) {
 			$joins[$tableCount] =
-				' JOIN \'.self::TABLE_NAME.\' ptbl ON (ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' . $reference->column .
-				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . '.\') ';
+				'JOIN \'.self::TABLE_NAME.\' ptbl ON (ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' . $reference->column .
+				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . '.\')';
 		} elseif ($prevAlias) {
 			$joins[$tableCount] =
-				' JOIN ' . $reference->referenced_table . ' ' . $prevAlias . ' ON (' . $prevAlias . '.' . $reference->referenced_column . ' = ' .
-				$alias . '.' . $reference->column . ') ';
+				'JOIN ' . $reference->referenced_table . ' ' . $prevAlias . ' ON (' . $prevAlias . '.' . $reference->referenced_column . ' = ' .
+				$alias . '.' . $reference->column . ')';
 		}
 		$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
 		       '@param $' . $reference->referenced_column . PHP_EOL . Configuration::TAB . ' * ' .
-		       '@return ' . $tblModel . '[]' . PHP_EOL . Configuration::TAB . ' */' .
-		       PHP_EOL . Configuration::TAB . 'function get' . $tblModel . '($' .
-		       $reference->referenced_column . '){' . PHP_EOL . Configuration::TAB . Configuration::TAB .
-		       '$query= \'SELECT ' . $alias . '.* FROM (' . $reference->table . ' ' . $alias . ')' . implode(' ', array_reverse($joins)) .
-		       ';\';' . PHP_EOL . Configuration::TAB . Configuration::TAB .
-		       '$qr=$this->DB->query($query);' . PHP_EOL . Configuration::TAB . Configuration::TAB .
-		       'return $qr->custom_result_object(\'' . $tblModel . '\');' .
+		       '@param int $limit' . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@param int $offset' . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@return ' . $tblModel . '[]' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
+		       'function get' . $tblModel . '($' . $reference->referenced_column . ', $limit = 100, $offset = 0){' .
+		       PHP_EOL . Configuration::TAB(2) . '$limit = (int)$limit;' .
+		       PHP_EOL . Configuration::TAB(2) . '$offset = (int)$offset;' .
+		       PHP_EOL . Configuration::TAB(2) .
+		       '$query= \'SELECT ' . $alias . '.* FROM (' . $reference->table . ' ' . $alias . ') ' . implode(' ', array_reverse($joins)) .
+		       ' LIMIT \'.$offset.\', \'.$limit.\';\';' . PHP_EOL . Configuration::TAB(2) .
+		       '$qr=$this->DB->query($query);' . PHP_EOL . Configuration::TAB(2) .
+		       'return $qr->custom_result_object(\'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel . '\');' .
 		       PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
 		$this->editExtension($str);
 		if (@$reference->children && is_array($reference->children)) {
 			foreach ($reference->children as $childRef) {
 				$this->createGet($childRef, $tableCount, $joins, $alias);
+			}
+		}
+	}
+
+	private function createCount($reference, &$tableCount = 0, &$joins = array(), $prevAlias = FALSE)
+	{
+		$tableCount = $this->tCount($joins, $tableCount);
+		$alias      = 'tbl' . $tableCount;
+		$tblModel   = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
+		if (isset($this->functions['c' . $tblModel])) return;
+		$this->functions['c' . $tblModel] = TRUE;
+		if (empty($joins)) {
+			$joins[$tableCount] =
+				'JOIN \'.self::TABLE_NAME.\' ptbl ON (ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' . $reference->column .
+				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . '.\')';
+		} elseif ($prevAlias) {
+			$joins[$tableCount] =
+				'JOIN ' . $reference->referenced_table . ' ' . $prevAlias . ' ON (' . $prevAlias . '.' . $reference->referenced_column . ' = ' .
+				$alias . '.' . $reference->column . ')';
+		}
+		$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@param $' . $reference->referenced_column . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@return int' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
+		       'function count' . $tblModel . '($' . $reference->referenced_column . '){' .
+		       PHP_EOL . Configuration::TAB(2) .
+		       '$query= \'SELECT COUNT(DISTINCT ' . $alias . '.id) _c FROM (' . $reference->table . ' ' . $alias . ') ' .
+		       implode(' ', array_reverse($joins)) . ' ;\';' . PHP_EOL . Configuration::TAB(2) .
+		       'return (int)@$this->DB->query($query)->row()->_c;' .
+		       PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
+		$this->editExtension($str);
+		if (@$reference->children && is_array($reference->children)) {
+			foreach ($reference->children as $childRef) {
+				$this->createCount($childRef, $tableCount, $joins, $alias);
 			}
 		}
 	}
@@ -124,6 +168,7 @@ class Extension
 		$this->createConstructor();
 		foreach ($fields as $field) {
 			$this->createGet($field);
+			$this->createCount($field);
 		}
 		$this->closeExtension();
 	}
