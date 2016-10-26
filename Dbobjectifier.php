@@ -92,9 +92,9 @@ class Dbobjectifier
 
 	/**
 	 *
-	 * @param type $tableName
+	 * @param string $tableName
 	 *
-	 * @return \Tablefield
+	 * @return \Tablefield[]
 	 */
 	private function getTableFields($tableName)
 	{
@@ -106,7 +106,7 @@ class Dbobjectifier
 		$columns = array();
 		$cols    = $stmt->fetchAll(PDO::FETCH_ASSOC);
 		foreach ($cols as $row) {
-			$columns[] = new Tablefield($row['Field'], $row['Type'], 'no' == trim(strtolower($row['Null'])), $row['Comment']);
+			$columns[] = new Tablefield($row);
 		}
 		return $columns;
 	}

@@ -36,8 +36,9 @@ class Model
 		foreach ($this->table->getFields() as $field) {
 			/* @var $field Tablefield */
 			$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ';
-			if ($field->comment) {
-				$str .= $field->comment . PHP_EOL . Configuration::TAB . ' * ';
+			$str .= $field->label . PHP_EOL . Configuration::TAB . ' * ';
+			if ($field->required) {
+				$str .= '(Required)' . PHP_EOL . Configuration::TAB . ' * ';
 			}
 			$str .= $field->dataType . PHP_EOL . Configuration::TAB . ' * ';
 			$str .= '@var ' . $field->commentDataTypeName;
@@ -103,7 +104,15 @@ class Model
 
 	private function startModel()
 	{
-		$dir = Configuration::$MODELS_DIRECTORY . Configuration::dbDirectoryName();
+		$dir      = Configuration::$MODELS_DIRECTORY . Configuration::dbDirectoryName();
+		$details   = [];
+		$fields   = $this->table->getFields();
+		foreach ($fields as $field) {
+			$details[] =
+				'\'' . $field->name . '\' => [\'type\'=>\'' . trim($field->commentDataTypeName) . '\', \'label\' => \'' . $field->label .
+				'\', \'unique\' => ' . strtoupper(var_export($field->unique, TRUE)) .
+				', \'required\' => ' . strtoupper(var_export($field->required, TRUE)) . ']';
+		}
 		if (!file_exists($dir) || !is_dir($dir)) {
 			if (!mkdir($dir, 0755, TRUE)) {
 				$this->startModel();
@@ -117,12 +126,13 @@ class Model
 		       PHP_EOL . 'use Database;' . PHP_EOL .
 		       PHP_EOL . 'class ' . $this->table->model . ' extends Database\ModelAction{' . PHP_EOL . PHP_EOL;
 		$str .= Configuration::TAB . 'CONST TABLE_NAME = \'' . $this->table->name . '\';' . PHP_EOL;
+		$str .= Configuration::TAB . 'protected static $DETAILS = [' . implode(', ', $details) . '];' . PHP_EOL;
 		file_put_contents($dir . $this->table->model . '.php', $str . PHP_EOL, FILE_APPEND | LOCK_EX);
 	}
 
 	private function closeModel()
 	{
-		$str = '}' . PHP_EOL . PHP_EOL.
+		$str = '}' . PHP_EOL . PHP_EOL .
 		       '/*' . PHP_EOL .
 		       ' * --------------------------DON\'T REMOVE THIS------------------------- ' . PHP_EOL .
 		       ' * End of Class ' . $this->table->model . PHP_EOL .

@@ -1,5 +1,5 @@
 <?php
-
+error_reporting(E_ALL & ~E_WARNING);
 require_once 'factory/Model.php';
 require_once 'factory/Extension.php';
 require_once 'factory/Table.php';
@@ -15,7 +15,7 @@ require_once 'Configuration.php';
 require_once 'Dbobjectifier.php';
 //var_dump(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'models');
 
-$path = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'models'.DIRECTORY_SEPARATOR.'monitoreorg';
+$path = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'models' . DIRECTORY_SEPARATOR . 'monitoreorg';
 $dirs = glob($path . DIRECTORY_SEPARATOR . '*.{php}', GLOB_BRACE);
 echo '<pre>';
 //var_dump($dirs);

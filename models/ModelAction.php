@@ -1,17 +1,24 @@
 <?php
 namespace Database;
 
+require_once 'DbExtend.php';
+
 /**
  * Created by PhpStorm.
  * User: Angujo Barrack
  * Date: 19-Oct-16
  * Time: 7:27 PM
+ *
+ * @method $this whereTarget(string $column, string $value);
+ * @method $this wherePrimary(string $column, string $value);
+ * @method $this orderBy(string $column, string $order);
  */
 class ModelAction extends \Dbobjectifier
 {
-	//protected $DB = NULL;
 	CONST TABLE_NAME = '';
-	public $id = FALSE;
+	protected static $DETAILS  = [];
+	public           $id       = FALSE;
+	private          $DBExtend = NULL;
 
 	function __construct()
 	{
@@ -28,12 +35,47 @@ class ModelAction extends \Dbobjectifier
 
 	function save()
 	{
-		$table = static::TABLE_NAME;
+		$this->checkValues();
+		if (!DBOStatus::$OK) return FALSE;
 		if ($this->id) {
-			return $this->update($table);
+			return $this->update();
 		} else {
 			unset($this->id);
-			return $this->insert($table);
+			return $this->insert();
+		}
+	}
+
+	private function checkValues()
+	{
+		DBOStatus::$OK = TRUE;
+		$required      = array();
+		$unique        = array();
+		foreach (static::$DETAILS as $field => $detail) {
+			if ($detail['required'] && (!isset($this->{$field}) || 0 >= strlen($this->{$field}))) {
+				$required[] = $detail['label'];
+			}
+			if ($detail['unique']) {
+				$unique[$field] = @$this->{$field};
+			}
+		}
+		if ($required) {
+			DBOStatus::$OK     = FALSE;
+			DBOStatus::$ERROR  = 'The following field(s) is/are <b>REQUIRED</b>:<br/><ol>' . implode('', array_map(function ($f) {
+					return '<li>' . $f . '</li>';
+				}, $required)) . '</ol>';
+			DBOStatus::$RESULT = NULL;
+		}
+		if ($unique) {
+			$this->DB->group_start();
+			foreach ($unique as $col => $item) {
+				$this->DB->or_where($col, $item);
+			}
+			$this->DB->group_end()->where('id !=', (int)@$this->id);
+			if ($this->DB->count_all_results(static::TABLE_NAME)) {
+				DBOStatus::$OK     = FALSE;
+				DBOStatus::$ERROR  = 'Your entries already exist!';
+				DBOStatus::$RESULT = NULL;
+			}
 		}
 	}
 
@@ -109,21 +151,27 @@ class ModelAction extends \Dbobjectifier
 		return $q->custom_result_object(get_class($this));
 	}
 
-	private function insert($table)
+	private function insert()
 	{
-		$this->DB->insert($table, $this);
+		$this->DB->insert(static::TABLE_NAME, $this);
 		$this->id = $this->DB->insert_id();
-		return (bool)$this->id;
+		$res      = (bool)$this->id;
+		if ($res) {
+			$this->actionRegister('insert');
+		}
+		return $res;
 	}
 
-	private function update($table)
+	private function update()
 	{
 		$id = $this->id;
 		$this->DB->where('id', $id);
 		unset($this->id);
-		$this->DB->update($table, $this);
+		$this->DB->update(static::TABLE_NAME, $this);
 		$this->id = $id;
-		return (bool)$this->DB->affected_rows();
+		$res      = (bool)$this->DB->affected_rows();
+		$this->actionRegister($res ? 'update' : 'update_attempt');
+		return $res;
 	}
 
 	function init(array $data)
@@ -141,6 +189,15 @@ class ModelAction extends \Dbobjectifier
 			return call_user_func_array(array($this, $name), $arguments);
 		}
 		if (isset($this->{$name})) return $this->{$name};
+		if (!$this->DBExtend) {
+			$this->DBExtend = new DbExtend($this->DB);
+		}
+		if (method_exists($this->DBExtend, $name)) {
+			if (is_callable(array($this->DBExtend, $name), TRUE)) {
+				call_user_func_array(array($this->DBExtend, $name), $arguments);
+				return $this;
+			}
+		}
 		throw new \Exception('Invalid call to method : ' . $name . '! METHOD DOES NOT EXIST!');
 	}
 
@@ -148,6 +205,27 @@ class ModelAction extends \Dbobjectifier
 	{
 		return $this->DB->last_query();
 	}
+
+	private function actionRegister($action)
+	{
+		$table = preg_replace('/[^a-zA-Z0-9_]/', '', strtolower($this->DB->database . '_events'));
+		if (!$this->DB->table_exists($table)) {
+			$q = 'CREATE TABLE `' . $table .
+			     '`( `id` INT UNSIGNED NOT NULL AUTO_INCREMENT, `row_id` INT DEFAULT 0, `action` VARCHAR(200), `action_user` INT DEFAULT 0, `table_name` VARCHAR(250), `event_date` DATETIME, PRIMARY KEY (`id`) );';
+			if (!$this->DB->simple_query($q)) {
+				return;
+			}
+		}
+		$this->DB->insert($table, array('action'     => $action, 'action_user' => (int)self::$ACTION_USER, 'table_name' => static::TABLE_NAME,
+		                                'event_date' => date('Y-m-d H:i:s'), 'row_id' => (int)@$this->id));
+	}
+}
+
+class DBOStatus
+{
+	static $OK    = TRUE;
+	static $ERROR = '';
+	static $RESULT;
 }
 
 $dirs = glob(dirname(__FILE__) . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);

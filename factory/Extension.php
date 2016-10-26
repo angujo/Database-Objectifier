@@ -99,12 +99,20 @@ class Extension
 		$this->functions[$tblModel] = TRUE;
 		if (empty($joins)) {
 			$joins[$tableCount] =
+				'$this->DB->join(self::TABLE_NAME.\' ptbl\', \'ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' .
+				$reference->column .
+				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . ');';
+			/*$joins[$tableCount] =
 				'JOIN \'.self::TABLE_NAME.\' ptbl ON (ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' . $reference->column .
-				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . '.\')';
+				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . '.\')';*/
 		} elseif ($prevAlias) {
 			$joins[$tableCount] =
+				'$this->DB->join(\'' . $reference->referenced_table . ' ' . $prevAlias . '\', \'' . $prevAlias . '.' .
+				$reference->referenced_column . ' = ' .
+				$alias . '.' . $reference->column . '\');';
+			/*$joins[$tableCount] =
 				'JOIN ' . $reference->referenced_table . ' ' . $prevAlias . ' ON (' . $prevAlias . '.' . $reference->referenced_column . ' = ' .
-				$alias . '.' . $reference->column . ')';
+				$alias . '.' . $reference->column . ')';*/
 		}
 		$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
 		       '@param $' . $reference->referenced_column . PHP_EOL . Configuration::TAB . ' * ' .
@@ -114,12 +122,16 @@ class Extension
 		       'function get' . $tblModel . '($' . $reference->referenced_column . ', $limit = 100, $offset = 0){' .
 		       PHP_EOL . Configuration::TAB(2) . '$limit = (int)$limit;' .
 		       PHP_EOL . Configuration::TAB(2) . '$offset = (int)$offset;' .
+		       PHP_EOL . Configuration::TAB(2) . implode(PHP_EOL . Configuration::TAB(2), array_reverse($joins)) . PHP_EOL .
+		       Configuration::TAB(2) .
+		       '$qr= $this->DB->select(\'' . $alias . '.*\')->get(\'' . $reference->table . ' ' . $alias . '\', $limit, $offset);' .
 		       PHP_EOL . Configuration::TAB(2) .
-		       '$query= \'SELECT ' . $alias . '.* FROM (' . $reference->table . ' ' . $alias . ') ' . implode(' ', array_reverse($joins)) .
+		       /*'$query= \'SELECT ' . $alias . '.* FROM (' . $reference->table . ' ' . $alias . ') ' . implode(' ', array_reverse($joins)) .
 		       ' LIMIT \'.$offset.\', \'.$limit.\';\';' . PHP_EOL . Configuration::TAB(2) .
-		       '$qr=$this->DB->query($query);' . PHP_EOL . Configuration::TAB(2) .
+		       '$qr=$this->DB->query($query);' . PHP_EOL . Configuration::TAB(2) .*/
 		       'return $qr->custom_result_object(\'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel . '\');' .
 		       PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
+		$str = str_ireplace($alias, 't_tbl', $str);
 		$this->editExtension($str);
 		if (@$reference->children && is_array($reference->children)) {
 			foreach ($reference->children as $childRef) {
