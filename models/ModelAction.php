@@ -9,28 +9,29 @@ require_once 'DbExtend.php';
  * Date: 19-Oct-16
  * Time: 7:27 PM
  *
- * @method $this whereTarget(string $column, string $value);
- * @method $this wherePrimary(string $column, string $value);
- * @method $this orderBy(string $column, string $order);
  */
 class ModelAction extends \Dbobjectifier
 {
-	CONST TABLE_NAME = '';
-	protected static $DETAILS  = [];
-	public           $id       = FALSE;
-	private          $DBExtend = NULL;
+	private static $TABLE_NAME = '';
+	private static $DETAILS    = [];
+	private        $DBExtend   = NULL;
+	private static $MODEL_NAME = '';
+	private static $MODEL;
 
-	function __construct()
+	function __construct($model = '', $table = '')
 	{
 		parent::__construct();
-		$object = get_class($this);
-		if (!static::TABLE_NAME) {
-			throw new \Exception($object . ' IS MISSING TABLE!');
+		$this::$MODEL_NAME = $model;
+		if ($this::$MODEL_NAME && class_exists($model)) {
+			$this::$MODEL = new $model();
+			if (constant($this::$MODEL_NAME . '::DETAILS')) {
+				$this::$DETAILS = constant($this::$MODEL_NAME . '::DETAILS');
+			}
 		}
-		if (!isset($this->id) || FALSE === $this->id) {
-			throw new \Exception($object . ' IS MISSING COLUMN [ID]!');
+		$this::$TABLE_NAME = $table;
+		if (!$this::$TABLE_NAME) {
+			throw new \Exception($model . ' IS MISSING TABLE!');
 		}
-		$this->id = (int)$this->id;
 	}
 
 	function save()
@@ -50,7 +51,7 @@ class ModelAction extends \Dbobjectifier
 		DBOStatus::$OK = TRUE;
 		$required      = array();
 		$unique        = array();
-		foreach (static::$DETAILS as $field => $detail) {
+		foreach ($this::$DETAILS as $field => $detail) {
 			if ($detail['required'] && (!isset($this->{$field}) || 0 >= strlen($this->{$field}))) {
 				$required[] = $detail['label'];
 			}
@@ -71,7 +72,7 @@ class ModelAction extends \Dbobjectifier
 				$this->DB->or_where($col, $item);
 			}
 			$this->DB->group_end()->where('id !=', (int)@$this->id);
-			if ($this->DB->count_all_results(static::TABLE_NAME)) {
+			if ($this->DB->count_all_results($this::$TABLE_NAME)) {
 				DBOStatus::$OK     = FALSE;
 				DBOStatus::$ERROR  = 'Your entries already exist!';
 				DBOStatus::$RESULT = NULL;
@@ -84,7 +85,7 @@ class ModelAction extends \Dbobjectifier
 	 */
 	function delete()
 	{
-		$this->DB->where('id', $this->id)->delete(static::TABLE_NAME);
+		$this->DB->where('id', $this::$MODEL->id)->delete($this::$TABLE_NAME);
 		return (bool)$this->DB->affected_rows();
 	}
 
@@ -110,9 +111,9 @@ class ModelAction extends \Dbobjectifier
 		} else {
 			$this->DB->where('id', (int)$conditions);
 		}
-		$q = $this->DB->get(static::TABLE_NAME, 1);
+		$q = $this->DB->get($this::$TABLE_NAME, 1);
 		if (!$q->num_rows()) return NULL;
-		return $q->custom_row_object(0, get_class($this));
+		return $q->custom_row_object(0, $this::$MODEL_NAME);
 	}
 
 	/**
@@ -146,14 +147,14 @@ class ModelAction extends \Dbobjectifier
 			}
 			$this->DB->group_end();
 		}
-		$q = $this->DB->get(static::TABLE_NAME, (int)$limitCount, (int)$offset);
+		$q = $this->DB->get($this::$TABLE_NAME, (int)$limitCount, (int)$offset);
 		if (!$q->num_rows()) return NULL;
 		return $q->custom_result_object(get_class($this));
 	}
 
 	private function insert()
 	{
-		$this->DB->insert(static::TABLE_NAME, $this);
+		$this->DB->insert($this::$TABLE_NAME, $this);
 		$this->id = $this->DB->insert_id();
 		$res      = (bool)$this->id;
 		if ($res) {
@@ -167,7 +168,7 @@ class ModelAction extends \Dbobjectifier
 		$id = $this->id;
 		$this->DB->where('id', $id);
 		unset($this->id);
-		$this->DB->update(static::TABLE_NAME, $this);
+		$this->DB->update($this::$TABLE_NAME, $this);
 		$this->id = $id;
 		$res      = (bool)$this->DB->affected_rows();
 		$this->actionRegister($res ? 'update' : 'update_attempt');
@@ -206,6 +207,11 @@ class ModelAction extends \Dbobjectifier
 		return $this->DB->last_query();
 	}
 
+	function getDB()
+	{
+		return $this->DB;
+	}
+
 	private function actionRegister($action)
 	{
 		$table = preg_replace('/[^a-zA-Z0-9_]/', '', strtolower($this->DB->database . '_events'));
@@ -216,7 +222,7 @@ class ModelAction extends \Dbobjectifier
 				return;
 			}
 		}
-		$this->DB->insert($table, array('action'     => $action, 'action_user' => (int)self::$ACTION_USER, 'table_name' => static::TABLE_NAME,
+		$this->DB->insert($table, array('action'     => $action, 'action_user' => (int)self::$ACTION_USER, 'table_name' => $this::$TABLE_NAME,
 		                                'event_date' => date('Y-m-d H:i:s'), 'row_id' => (int)@$this->id));
 	}
 }
