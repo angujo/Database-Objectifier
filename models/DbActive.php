@@ -27,45 +27,69 @@ class DbActive
 	/**
 	 * @var ModelAction
 	 */
-	private static $MODEL_ACTION;
-	private static $MODEL;
-	private static $MODEL_NAME;
-	private static $DB_EXTEND;
+	private static   $MODEL_ACTION;
+	private static   $MODEL;
+	protected static $MODEL_NAME;
+	private static   $DB_EXTEND;
 	CONST TABLE_NAME = '';
+
+	public function __construct($conditions = FALSE)
+	{
+	}
+
+	function init(array $details)
+	{
+		$this->sLoad();
+		if ($this::$MODEL) {
+			$props = get_class_vars(get_class($this::$MODEL));
+			foreach ($props as $prop) {
+				if (isset($details[$prop])) {
+					$this::$MODEL->{$prop} = $details[$prop];
+				}
+			}
+		} else {
+			$props = get_class_vars(get_class($this));
+			foreach ($props as $prop) {
+				if (isset($details[$prop])) {
+					$this->{$prop} = $details[$prop];
+				}
+			}
+		}
+	}
 
 	private function sLoad()
 	{
-		if (!$this::$MODEL_ACTION) {
-			$this::$MODEL_ACTION = new ModelAction();
+		if (static::$MODEL_NAME && class_exists(static::$MODEL_NAME)) {
+			self::$MODEL = new static::$MODEL_NAME();
 		}
-		if (!$this::$DB_EXTEND) {
-			$this::$DB_EXTEND = new DbExtend($this::$MODEL_ACTION->getDB());
+		if (!self::$MODEL_ACTION) {
+			self::$MODEL        = self::$MODEL ?: $this;
+			self::$MODEL_ACTION = new ModelAction(self::$MODEL);
 		}
-		if (!static::$MODEL_NAME || !class_exists(static::$MODEL_NAME)) {
-			return NULL;
+		if (!self::$DB_EXTEND) {
+			self::$DB_EXTEND = new DbExtend(self::$MODEL_ACTION->DB);
 		}
-		if (!static::$MODEL) {
-			static::$MODEL = new static::$MODEL_NAME();
-		}
-		return TRUE;
 	}
 
 	function __call($name, $arguments)
 	{
 		$this->sLoad();
-		if (method_exists($this::$DB_EXTEND, $name)) {
-			call_user_func_array(array($this::$DB_EXTEND, $name), $arguments);
+		if (method_exists(self::$DB_EXTEND, $name)) {
+			call_user_func_array(array(self::$DB_EXTEND, $name), $arguments);
 			return $this;
 		}
-		if (!method_exists($this::$MODEL_ACTION, $name) || !is_callable(array($this::$MODEL_ACTION, $name))) return NULL;
-		return call_user_func_array(array($this::$MODEL_ACTION, $name), $arguments);
+		if (self::$MODEL && method_exists(self::$MODEL, $name)) {
+			return call_user_func_array(array(self::$MODEL, $name), $arguments);
+		}
+		if (!method_exists(self::$MODEL_ACTION, $name) || !is_callable(array(self::$MODEL_ACTION, $name))) return NULL;
+		return call_user_func_array(array(self::$MODEL_ACTION, $name), $arguments);
 	}
 
 	function __get($name)
 	{
-		if (!$this->sLoad()) return NULL;
-
-		if (isset(static::$MODEL->{$name})) return static::$MODEL->{$name};
+		$this->sLoad();
+		if (isset(self::$MODEL->{$name})) return self::$MODEL->{$name};
+		if (isset(self::$MODEL_ACTION->{$name})) return self::$MODEL_ACTION->{$name};
 		return NULL;
 	}
 }

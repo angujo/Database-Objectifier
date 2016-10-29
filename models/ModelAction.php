@@ -2,6 +2,7 @@
 namespace Database;
 
 require_once 'DbExtend.php';
+require_once 'DbActive.php';
 
 /**
  * Created by PhpStorm.
@@ -15,22 +16,32 @@ class ModelAction extends \Dbobjectifier
 	private static $TABLE_NAME = '';
 	private static $DETAILS    = [];
 	private        $DBExtend   = NULL;
-	private static $MODEL_NAME = '';
 	private static $MODEL;
 
-	function __construct($model = '', $table = '')
+	/**
+	 * ModelAction constructor.
+	 *
+	 * @param $model DbActive
+	 *
+	 * @throws \Exception
+	 */
+	function __construct(&$model)
 	{
 		parent::__construct();
-		$this::$MODEL_NAME = $model;
-		if ($this::$MODEL_NAME && class_exists($model)) {
-			$this::$MODEL = new $model();
-			if (constant($this::$MODEL_NAME . '::DETAILS')) {
-				$this::$DETAILS = constant($this::$MODEL_NAME . '::DETAILS');
+		if ($model && is_object($model) && class_exists(get_class($model))) {
+			if (!is_subclass_of($model, 'Database\DbActive')) {
+				throw new \Exception(get_class($model).' should extend DbActive');
 			}
+			$this::$MODEL = &$model;
+			if (isset($this::$MODEL->{$this::$TABLE_NAME . '_DETAILS'})) {
+				$this::$DETAILS = $this::$MODEL->{$this::$TABLE_NAME . '_DETAILS'};
+			}
+		} else {
+			throw new \Exception('Invalid object sent to ModalAction');
 		}
-		$this::$TABLE_NAME = $table;
+		$this::$TABLE_NAME = @$model::TABLE_NAME;
 		if (!$this::$TABLE_NAME) {
-			throw new \Exception($model . ' IS MISSING TABLE!');
+			throw new \Exception(get_class($model) . ' IS MISSING TABLE!');
 		}
 	}
 
@@ -86,7 +97,12 @@ class ModelAction extends \Dbobjectifier
 	function delete()
 	{
 		$this->DB->where('id', $this::$MODEL->id)->delete($this::$TABLE_NAME);
-		return (bool)$this->DB->affected_rows();
+		$res = (bool)$this->DB->affected_rows();
+		if ($res) {
+			unset($this::$MODEL->id);
+			$this->actionRegister('delete');
+		}
+		return $res;
 	}
 
 	/**
@@ -113,7 +129,7 @@ class ModelAction extends \Dbobjectifier
 		}
 		$q = $this->DB->get($this::$TABLE_NAME, 1);
 		if (!$q->num_rows()) return NULL;
-		return $q->custom_row_object(0, $this::$MODEL_NAME);
+		return $q->custom_row_object(0, get_class($this::$MODEL));
 	}
 
 	/**
@@ -149,14 +165,14 @@ class ModelAction extends \Dbobjectifier
 		}
 		$q = $this->DB->get($this::$TABLE_NAME, (int)$limitCount, (int)$offset);
 		if (!$q->num_rows()) return NULL;
-		return $q->custom_result_object(get_class($this));
+		return $q->custom_result_object(get_class($this::$MODEL));
 	}
 
 	private function insert()
 	{
 		$this->DB->insert($this::$TABLE_NAME, $this);
-		$this->id = $this->DB->insert_id();
-		$res      = (bool)$this->id;
+		$this::$MODEL->id = $this->DB->insert_id();
+		$res              = (bool)$this::$MODEL->id;
 		if ($res) {
 			$this->actionRegister('insert');
 		}
@@ -165,41 +181,14 @@ class ModelAction extends \Dbobjectifier
 
 	private function update()
 	{
-		$id = $this->id;
+		$id = $this::$MODEL->id;
 		$this->DB->where('id', $id);
-		unset($this->id);
+		unset($this::$MODEL->id);
 		$this->DB->update($this::$TABLE_NAME, $this);
-		$this->id = $id;
-		$res      = (bool)$this->DB->affected_rows();
+		$this::$MODEL->id = $id;
+		$res              = (bool)$this->DB->affected_rows();
 		$this->actionRegister($res ? 'update' : 'update_attempt');
 		return $res;
-	}
-
-	function init(array $data)
-	{
-		foreach ($data as $column => $value) {
-			if (!trim($column)) continue;
-			if (isset($this->{$column})) $this->{$column} = $value;
-		}
-		return $this;
-	}
-
-	function __call($name, $arguments)
-	{
-		if (method_exists($this, $name)) {
-			return call_user_func_array(array($this, $name), $arguments);
-		}
-		if (isset($this->{$name})) return $this->{$name};
-		if (!$this->DBExtend) {
-			$this->DBExtend = new DbExtend($this->DB);
-		}
-		if (method_exists($this->DBExtend, $name)) {
-			if (is_callable(array($this->DBExtend, $name), TRUE)) {
-				call_user_func_array(array($this->DBExtend, $name), $arguments);
-				return $this;
-			}
-		}
-		throw new \Exception('Invalid call to method : ' . $name . '! METHOD DOES NOT EXIST!');
 	}
 
 	function lastQuery()

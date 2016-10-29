@@ -21,11 +21,11 @@ class Model
 		$this->table = $table;
 	}
 
-	function generate(&$constructorArgs = array())
+	function generate()
 	{
 		$this->startModel();
 		$this->createProperties();
-		$this->createConstructor($constructorArgs);
+		$this->createConstructor();
 		$this->createSetters();
 		$this->createGetters();
 		$this->closeModel();
@@ -82,31 +82,19 @@ class Model
 		}
 	}
 
-	private function createConstructor(&$arguments = array())
+	private function createConstructor()
 	{
-		$args      = array();
-		$instances = array();
-		$fields    = $this->table->getFields();
-		foreach ($fields as $field) {
-			if ('id' == $field->name) continue;
-			if ($field->required) {
-				$args[]                        = $field->argDataTypeName . '$' . $field->name . " = " . $field->varDefaultValue;
-				$arguments['$' . $field->name] = $field->argDataTypeName . '$' . $field->name . " = " . $field->varDefaultValue;
-				$instances[]                   =
-					Configuration::TAB(2) . '$this->' . $field->name . ' = ' . $field->constDefaultValue . ';';
-			}
-		}
-		$str =
-			Configuration::TAB . 'function __constructor(' . implode(', ', $args) . '){' . PHP_EOL . implode(PHP_EOL, $instances) . PHP_EOL .
+		$str =			Configuration::TAB . 'function __construct($conditions=FALSE){' . PHP_EOL . Configuration::TAB(2) .
+			'parent::__construct($conditions);' . PHP_EOL .
 			Configuration::TAB . '}' . PHP_EOL;
 		$this->editModel($str);
 	}
 
 	private function startModel()
 	{
-		$dir      = Configuration::$MODELS_DIRECTORY . Configuration::dbDirectoryName();
-		$details   = [];
-		$fields   = $this->table->getFields();
+		$dir     = Configuration::$MODELS_DIRECTORY . Configuration::dbDirectoryName();
+		$details = [];
+		$fields  = $this->table->getFields();
 		foreach ($fields as $field) {
 			$details[] =
 				'\'' . $field->name . '\' => [\'type\'=>\'' . trim($field->commentDataTypeName) . '\', \'label\' => \'' . $field->label .
@@ -124,7 +112,7 @@ class Model
 		}
 		$str = '<?php ' . PHP_EOL . PHP_EOL . 'namespace Database\\' . Configuration::dbNamespace() . ';' . PHP_EOL .
 		       PHP_EOL . 'use Database;' . PHP_EOL .
-		       PHP_EOL . 'class ' . $this->table->model . ' extends Database\ModelAction{' . PHP_EOL . PHP_EOL;
+		       PHP_EOL . 'class ' . $this->table->model . ' extends Database\DbActive{' . PHP_EOL . PHP_EOL;
 		$str .= Configuration::TAB . 'CONST TABLE_NAME = \'' . $this->table->name . '\';' . PHP_EOL;
 		$str .= Configuration::TAB . 'protected static $DETAILS = [' . implode(', ', $details) . '];' . PHP_EOL;
 		file_put_contents($dir . $this->table->model . '.php', $str . PHP_EOL, FILE_APPEND | LOCK_EX);

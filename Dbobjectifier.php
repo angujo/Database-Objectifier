@@ -118,12 +118,14 @@ class Dbobjectifier
 		foreach ($tables as $table) {
 			$constArgs = array();
 			$m         = new Model($table);
-			$m->generate($constArgs);
-			$e = new Extension($table, $constArgs);
-			$e->generate($this->getReferences($table->name));
+			$m->generate();
+			if ($refs = $this->getReferences($table->name)) {
+				$e = new Extension($table, $constArgs);
+				$e->generate($refs);
+			}
 		}
 		echo '<pre>';
-		var_dump($this->tableReferences);
+		//var_dump($this->tableReferences);
 		echo '</pre>';
 	}
 

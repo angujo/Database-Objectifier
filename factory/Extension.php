@@ -25,10 +25,13 @@ class Extension
 	 */
 	private $extensionName;
 
+	private $tableAliases = array();
+
 	private $functions = array();
 
 	function __construct(Table $table, $constArgs)
 	{
+		$this->table           = $table;
 		$this->objectName      = $table->model;
 		$this->constructorArgs = $constArgs;
 		$this->extensionName   = $this->objectName . 'Ext';
@@ -36,6 +39,16 @@ class Extension
 
 	private function startExtension()
 	{
+		$inherits = [];
+		$fs       = $this->table->getFields();
+		foreach ($fs as $f) {
+			$inherits[] = ' * @property ' . $f->commentDataTypeName . ' $' . $f->name;
+			$inherits[] =
+				' * @method $this set' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $f->name))) . '(' . $f->commentDataTypeName .
+				'$' . $f->name . ')';
+			$inherits[] =
+				' * @method ' . $f->commentDataTypeName . ' get' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $f->name))) . '()';
+		}
 		$dir = Configuration::$MODELS_DIRECTORY . Configuration::dbDirectoryName();
 		if (!file_exists($dir) || !is_dir($dir)) {
 			if (!mkdir($dir, 0755, TRUE)) {
@@ -47,8 +60,11 @@ class Extension
 			unlink($dir . $this->extensionName . '.php');
 		}
 		$str = '<?php ' . PHP_EOL . PHP_EOL . 'namespace Database\\' . Configuration::dbNamespace() . ';' . PHP_EOL .
-		       // PHP_EOL . 'use Database\\' . Configuration::dbNamespace() . '\\' . $this->objectName . ';' . PHP_EOL .
-		       PHP_EOL . 'class ' . $this->extensionName . ' extends ' . $this->objectName . ' {' . PHP_EOL;
+		       'use Database\\DbActive;' . PHP_EOL . '/**' . PHP_EOL .
+		       implode(PHP_EOL, $inherits) . PHP_EOL . ' */' . PHP_EOL .
+		       'class ' . $this->extensionName . ' extends DbActive {' . PHP_EOL . PHP_EOL . Configuration::TAB .
+		       'protected static $MODEL_NAME = \'' . $this->objectName . '\';' . PHP_EOL . PHP_EOL . Configuration::TAB .
+		       'CONST TABLE_NAME = \'' . $this->table->name . '\';' . PHP_EOL . PHP_EOL;
 		file_put_contents($dir . $this->extensionName . '.php', $str . PHP_EOL, FILE_APPEND | LOCK_EX);
 	}
 
@@ -76,43 +92,41 @@ class Extension
 
 	private function createConstructor()
 	{
-		$str = Configuration::TAB . 'function __constructor(' . implode(', ', $this->constructorArgs) . '){' . PHP_EOL .
-		       Configuration::TAB(2) . 'parent::__constructor(' . implode(', ', array_keys($this->constructorArgs)) . ');' .
+		$str = Configuration::TAB . 'function __construct($conditions=FALSE){' . PHP_EOL .
+		       Configuration::TAB(2) . 'parent::__construct($conditions);' .
 		       PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
 		$this->editExtension($str);
 	}
 
-	private function tCount($joins, $c)
+	/**
+	 * Method to ensure table aliases remain consistent for any given extension.
+	 *
+	 * @param $tableName string
+	 *
+	 * @return string
+	 */
+	private function alias($tableName)
 	{
-		if (isset($joins[$c])) {
-			return $this->tCount($joins, ($c + 1));
+		if (!isset($this->tableAliases[$tableName])) {
+			$this->tableAliases[$tableName] = 'tbl' . count($this->tableAliases);
 		}
-		return $c;
+		return $this->tableAliases[$tableName];
 	}
 
-	private function createGet($reference, &$tableCount = 0, &$joins = array(), $prevAlias = FALSE)
+	private function createGet($reference, $joins = array())
 	{
-		$tableCount = $this->tCount($joins, $tableCount);
-		$alias      = 'tbl' . $tableCount;
-		$tblModel   = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
+		$tblModel = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
 		if (isset($this->functions[$tblModel])) return;
 		$this->functions[$tblModel] = TRUE;
 		if (empty($joins)) {
-			$joins[$tableCount] =
-				'$this->DB->join(self::TABLE_NAME.\' ptbl\', \'ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' .
-				$reference->column .
-				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . ');';
-			/*$joins[$tableCount] =
-				'JOIN \'.self::TABLE_NAME.\' ptbl ON (ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' . $reference->column .
-				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . '.\')';*/
-		} elseif ($prevAlias) {
-			$joins[$tableCount] =
-				'$this->DB->join(\'' . $reference->referenced_table . ' ' . $prevAlias . '\', \'' . $prevAlias . '.' .
-				$reference->referenced_column . ' = ' .
-				$alias . '.' . $reference->column . '\');';
-			/*$joins[$tableCount] =
-				'JOIN ' . $reference->referenced_table . ' ' . $prevAlias . ' ON (' . $prevAlias . '.' . $reference->referenced_column . ' = ' .
-				$alias . '.' . $reference->column . ')';*/
+			$joins[] =
+				'$this->DB->where(\'' . $this->alias($reference->table) . '.' . $reference->column . '\', (int)$' .
+				$reference->referenced_column . ');';
+		} else {
+			$joins[$reference->referenced_table] =
+				'$this->DB->join(\'' . $reference->referenced_table . ' ' . $this->alias($reference->referenced_table) . '\', \'' .
+				$this->alias($reference->referenced_table) . '.' . $reference->referenced_column . ' = ' . $this->alias($reference->table) .
+				'.' . $reference->column . '\');';
 		}
 		$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
 		       '@param $' . $reference->referenced_column . PHP_EOL . Configuration::TAB . ' * ' .
@@ -124,61 +138,57 @@ class Extension
 		       PHP_EOL . Configuration::TAB(2) . '$offset = (int)$offset;' .
 		       PHP_EOL . Configuration::TAB(2) . implode(PHP_EOL . Configuration::TAB(2), array_reverse($joins)) . PHP_EOL .
 		       Configuration::TAB(2) .
-		       '$qr= $this->DB->select(\'' . $alias . '.*\')->get(\'' . $reference->table . ' ' . $alias . '\', $limit, $offset);' .
+		       '$qr= $this->DB->select(\'' . $this->alias($reference->table) . '.*\')->get(\'' . $reference->table . ' ' .
+		       $this->alias($reference->table) . '\', $limit, $offset);' .
 		       PHP_EOL . Configuration::TAB(2) .
-		       /*'$query= \'SELECT ' . $alias . '.* FROM (' . $reference->table . ' ' . $alias . ') ' . implode(' ', array_reverse($joins)) .
-		       ' LIMIT \'.$offset.\', \'.$limit.\';\';' . PHP_EOL . Configuration::TAB(2) .
-		       '$qr=$this->DB->query($query);' . PHP_EOL . Configuration::TAB(2) .*/
 		       'return $qr->custom_result_object(\'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel . '\');' .
 		       PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
-		$str = str_ireplace($alias, 't_tbl', $str);
 		$this->editExtension($str);
 		if (@$reference->children && is_array($reference->children)) {
 			foreach ($reference->children as $childRef) {
-				$this->createGet($childRef, $tableCount, $joins, $alias);
+				$this->createGet($childRef, $joins);
 			}
 		}
 	}
 
-	private function createCount($reference, &$tableCount = 0, &$joins = array(), $prevAlias = FALSE)
+	private function createCount($reference, &$joins = array())
 	{
-		$tableCount = $this->tCount($joins, $tableCount);
-		$alias      = 'tbl' . $tableCount;
-		$tblModel   = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
-		if (isset($this->functions['c' . $tblModel])) return;
-		$this->functions['c' . $tblModel] = TRUE;
+		$tblModel = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
+		if (isset($this->functions['cnt' . $tblModel])) return;
+		$this->functions['cnt' . $tblModel] = TRUE;
 		if (empty($joins)) {
-			$joins[$tableCount] =
-				'JOIN \'.self::TABLE_NAME.\' ptbl ON (ptbl.' . $reference->referenced_column . ' = ' . $alias . '.' . $reference->column .
-				' AND ptbl.' . $reference->referenced_column . ' = \'.(int)$' . $reference->referenced_column . '.\')';
-		} elseif ($prevAlias) {
-			$joins[$tableCount] =
-				'JOIN ' . $reference->referenced_table . ' ' . $prevAlias . ' ON (' . $prevAlias . '.' . $reference->referenced_column . ' = ' .
-				$alias . '.' . $reference->column . ')';
+			$joins[] =
+				'$this->DB->where(\'' . $this->alias($reference->table) . '.' . $reference->column . '\', (int)$' .
+				$reference->referenced_column . ');';
+		} else {
+			$joins[$reference->referenced_table] =
+				'$this->DB->join(\'' . $reference->referenced_table . ' ' . $this->alias($reference->referenced_table) . '\', \'' .
+				$this->alias($reference->referenced_table) . '.' . $reference->referenced_column . ' = ' . $this->alias($reference->table) .
+				'.' . $reference->column . '\');';
 		}
 		$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
 		       '@param $' . $reference->referenced_column . PHP_EOL . Configuration::TAB . ' * ' .
 		       '@return int' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
 		       'function count' . $tblModel . '($' . $reference->referenced_column . '){' .
-		       PHP_EOL . Configuration::TAB(2) .
-		       '$query= \'SELECT COUNT(DISTINCT ' . $alias . '.id) _c FROM (' . $reference->table . ' ' . $alias . ') ' .
-		       implode(' ', array_reverse($joins)) . ' ;\';' . PHP_EOL . Configuration::TAB(2) .
-		       'return (int)@$this->DB->query($query)->row()->_c;' .
-		       PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
+		       PHP_EOL . Configuration::TAB(2) . implode(PHP_EOL . Configuration::TAB(2), array_reverse($joins)) . PHP_EOL .
+		       Configuration::TAB(2) .
+		       'return (int)@$this->DB->select(\'COUNT(DISTINCT ' . $this->alias($reference->table) . '.id) _c\')->get(\'' . $reference->table . ' ' .
+		       $this->alias($reference->table) . '\')->row()->_c;' . PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
 		$this->editExtension($str);
 		if (@$reference->children && is_array($reference->children)) {
 			foreach ($reference->children as $childRef) {
-				$this->createCount($childRef, $tableCount, $joins, $alias);
+				$this->createCount($childRef, $joins);
 			}
 		}
 	}
 
-	function generate(array $fields)
+	function generate($fields)
 	{
 		if (empty($fields)) return;
 		$this->startExtension();
 		$this->createConstructor();
 		foreach ($fields as $field) {
+			if (!trim($field->table)) continue;
 			$this->createGet($field);
 			$this->createCount($field);
 		}
