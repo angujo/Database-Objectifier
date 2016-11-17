@@ -13,83 +13,83 @@ namespace Database;
  *
  * @package Database Yes
  *
- * @method $this whereTarget(string $column, string $value);
- * @method $this wherePrimary(string $column, string $value);
+ * @method $this where(string $column, string $value);
+ * @method $this whereIn(string $column, array $value);
+ * @method $this groupStart();
+ * @method $this groupEnd();
  * @method $this orderBy(string $column, string $order);
- * @method $this getOne($conditions);
- * @method bool delete($conditions);
- * @method $this save();
+ * @method bool delete();
+ * @method $this save(boolean $returnInstance = FALSE);
  * @method string lastQuery();
- * @method $this getAll(array $conditions, $limitCount = 30, $offset = 0, array $search = array());
+ * @method $this getAll(array $conditions, int $limitCount = 30, $offset = 0, array $search = array());
  */
 class DbActive
 {
-	/**
-	 * @var ModelAction
-	 */
-	private static   $MODEL_ACTION;
-	private static   $MODEL;
-	protected static $MODEL_NAME;
-	private static   $DB_EXTEND;
 	CONST TABLE_NAME = '';
 
-	public function __construct($conditions = FALSE)
+	public function __construct($conditions = NULL)
 	{
-	}
-
-	function init(array $details)
-	{
-		$this->sLoad();
-		if ($this::$MODEL) {
-			$props = get_class_vars(get_class($this::$MODEL));
-			foreach ($props as $prop) {
-				if (isset($details[$prop])) {
-					$this::$MODEL->{$prop} = $details[$prop];
-				}
-			}
+		if (NULL === $conditions) return;
+		if (is_array($conditions)) {
+			$this->init($conditions);
 		} else {
-			$props = get_class_vars(get_class($this));
-			foreach ($props as $prop) {
-				if (isset($details[$prop])) {
-					$this->{$prop} = $details[$prop];
-				}
-			}
+			$this->init(CIModelAction::where('id', (int)$conditions)->getOne(static::TABLE_NAME));
 		}
 	}
 
-	private function sLoad()
+	public function init(array $details)
 	{
-		if (static::$MODEL_NAME && class_exists(static::$MODEL_NAME)) {
-			self::$MODEL = new static::$MODEL_NAME();
+		foreach ($this as $key => $val) {
+			$this->{$key} = NULL;
 		}
-		if (!self::$MODEL_ACTION) {
-			self::$MODEL        = self::$MODEL ?: $this;
-			self::$MODEL_ACTION = new ModelAction(self::$MODEL);
+		$vars = array_intersect_key($details, get_object_vars($this));
+		foreach ($vars as $property => $val) {
+			$this->{$property} = $val;
 		}
-		if (!self::$DB_EXTEND) {
-			self::$DB_EXTEND = new DbExtend(self::$MODEL_ACTION->DB);
-		}
+		return $this;
 	}
 
 	function __call($name, $arguments)
 	{
-		$this->sLoad();
-		if (method_exists(self::$DB_EXTEND, $name)) {
-			call_user_func_array(array(self::$DB_EXTEND, $name), $arguments);
+		$sub = substr($name, 0, 3);
+		if (in_array($sub, ['set', 'get'])) {
+			foreach ($this as $prop => $val) {
+				$func = $sub . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $prop)));
+				if ($name == $func) {
+					if ('get' == $sub) {
+						return $val;
+					}
+					if ('set' == $sub) {
+						if (1 <= count($arguments)) {
+							$this->{$prop} = $arguments[0];
+						}
+						return $this;
+					}
+				}
+			}
+		}
+		if (method_exists('Database\CIModelAction', $name)) {
+			if ('save' == $name) {
+				$id = CIModelAction::save(static::TABLE_NAME, get_object_vars($this));
+				if ($id && !$this->id) $this->id = $id;
+				return $id;
+			}
+			if ('delete' == $name && CIModelAction::where('id', $this->id)->delete(static::TABLE_NAME)) {
+				return NULL;
+			}
+			forward_static_call_array(['Database\CIModelAction', $name], $arguments);
 			return $this;
 		}
-		if (self::$MODEL && method_exists(self::$MODEL, $name)) {
-			return call_user_func_array(array(self::$MODEL, $name), $arguments);
-		}
-		if (!method_exists(self::$MODEL_ACTION, $name) || !is_callable(array(self::$MODEL_ACTION, $name))) return NULL;
-		return call_user_func_array(array(self::$MODEL_ACTION, $name), $arguments);
+		return NULL;
 	}
 
-	function __get($name)
+	protected function countClasses($conditions, $table)
 	{
-		$this->sLoad();
-		if (isset(self::$MODEL->{$name})) return self::$MODEL->{$name};
-		if (isset(self::$MODEL_ACTION->{$name})) return self::$MODEL_ACTION->{$name};
-		return NULL;
+		return CIModelAction::countObjects($table, $conditions);
+	}
+
+	protected function getClasses($conditions, $table, $class, $limit, $offSet)
+	{
+		return CIModelAction::getObjects($table, $conditions, $class, $limit, $offSet);
 	}
 }

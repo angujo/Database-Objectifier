@@ -15,19 +15,26 @@ class Model
 {
 
 	private $table;
+	private $functions    = array();
+	private $tableAliases = array();
 
 	public function __construct(Table $table)
 	{
 		$this->table = $table;
 	}
 
-	function generate()
+	function generate($references = array())
 	{
 		$this->startModel();
 		$this->createProperties();
 		$this->createConstructor();
-		$this->createSetters();
-		$this->createGetters();
+		//$this->createSetters();
+		//$this->createGetters();
+		foreach ($references as $field) {
+			if (!trim($field->table)) continue;
+			$this->createGet($field);
+			$this->createCount($field);
+		}
 		$this->closeModel();
 	}
 
@@ -48,45 +55,121 @@ class Model
 		}
 	}
 
+	/**
+	 * Method to ensure table aliases remain consistent for any given extension.
+	 *
+	 * @param $tableName string
+	 *
+	 * @return string
+	 */
+	private function alias($tableName)
+	{
+		if (!isset($this->tableAliases[$tableName])) {
+			$this->tableAliases[$tableName] = 'tbl' . count($this->tableAliases);
+		}
+		return $this->tableAliases[$tableName];
+	}
+
+	private function createCount($reference, $joins = array())
+	{
+		$tblModel = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
+		if (isset($this->functions['cnt' . $tblModel])) return;
+		$this->functions['cnt' . $tblModel] = TRUE;
+		if (empty($joins)) {
+			$joins[] =
+				'$details[]=[\'where\',[\'' . $this->alias($reference->table) . '.' . $reference->column . '\', (int)$this->' .
+				$reference->referenced_column . ']];';
+		} else {
+			$joins[$reference->referenced_table] =
+				'$details[]=[\'join\',[\'' . $reference->referenced_table . ' ' . $this->alias($reference->referenced_table) . '\', \'' .
+				$this->alias($reference->referenced_table) . '.' . $reference->referenced_column . ' = ' . $this->alias($reference->table) .
+				'.' . $reference->column . '\']];';
+		}
+		$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@return int' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
+		       'function count' . $tblModel . '(){' .
+		       PHP_EOL . Configuration::TAB(2) . 'if(!$this->' . $reference->referenced_column . ') return 0;' .
+		       PHP_EOL . Configuration::TAB(2) . '$details = [];' .
+		       PHP_EOL . Configuration::TAB(2) . implode(PHP_EOL . Configuration::TAB(2), array_reverse($joins)) . PHP_EOL .
+		       Configuration::TAB(2) . '$details[]=[\'select\',[\'COUNT(DISTINCT ' . $this->alias($reference->table) . '.id) _c\']];' .
+		       PHP_EOL . Configuration::TAB(2) . 'return $this->countClasses($details, \'' . $reference->table . ' ' .
+		       $this->alias($reference->table) . '\');' . PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
+		$str = str_ireplace($this->alias($reference->table), 't_tbl', $str);
+		$this->editModel($str);
+		if (@$reference->children && is_array($reference->children)) {
+			foreach ($reference->children as $childRef) {
+				$this->createCount($childRef, $joins);
+			}
+		}
+	}
+
+	private function createGet($reference, $joins = array())
+	{
+		$tblModel = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
+		if (isset($this->functions[$tblModel])) return;
+		$this->functions[$tblModel] = TRUE;
+		if (empty($joins)) {
+			$joins[] =
+				'$details[]=[\'where\',[\'' . $this->alias($reference->table) . '.' . $reference->column . '\', (int)$this->' .
+				$reference->referenced_column . ']];';
+		} else {
+			$joins[$reference->referenced_table] =
+				'$details[]=[\'join\',[\'' . $reference->referenced_table . ' ' . $this->alias($reference->referenced_table) . '\', \'' .
+				$this->alias($reference->referenced_table) . '.' . $reference->referenced_column . ' = ' . $this->alias($reference->table) .
+				'.' . $reference->column . '\']];';
+		}
+		$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@param int $limit' . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@param int $offset' . PHP_EOL . Configuration::TAB . ' * ' .
+		       '@return ' . $tblModel . '[]' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
+		       'function get' . $tblModel . '($limit = 100, $offset = 0){' .
+		       PHP_EOL . Configuration::TAB(2) . 'if(!$this->' . $reference->referenced_column . ') return [];' .
+		       PHP_EOL . Configuration::TAB(2) . '$limit = (int)$limit;' .
+		       PHP_EOL . Configuration::TAB(2) . '$offset = (int)$offset;' .
+		       PHP_EOL . Configuration::TAB(2) . '$details = [];' .
+		       PHP_EOL . Configuration::TAB(2) . implode(PHP_EOL . Configuration::TAB(2), array_reverse($joins)) . PHP_EOL .
+		       Configuration::TAB(2) . '$details[]=[\'select\',[\'' . $this->alias($reference->table) . '.*\']];' .
+		       PHP_EOL . Configuration::TAB(2) . 'return $this->getClasses($details, \'' . $reference->table . ' ' .
+		       $this->alias($reference->table) . '\', \'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel .
+		       '\', $limit, $offset);' . PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
+		$str = str_ireplace($this->alias($reference->table), 't_tbl', $str);
+		$this->editModel($str);
+		if (@$reference->children && is_array($reference->children)) {
+			foreach ($reference->children as $childRef) {
+				$this->createGet($childRef, $joins);
+			}
+		}
+	}
+
 	private function createSetters()
 	{
+		/* @var $fields Tablefield[] */
 		$fields = $this->table->getFields();
+		$str    = [];
 		foreach ($fields as $field) {
-			/* @var $field Tablefield */
-			$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ';
-			$str .= '@param ' . $field->commentDataTypeName . ' $' . $field->name;
-			$str .= PHP_EOL . Configuration::TAB . ' * ';
-			$str .= '@return $this';
-			$str .= PHP_EOL . Configuration::TAB . ' */' . PHP_EOL;
-			$str .= Configuration::TAB . 'public function set' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $field->name))) . '(' .
-			        $field->argDataTypeName . '$' . $field->name . '){' . PHP_EOL;
-			$str .= Configuration::TAB(2) . '$this->' . $field->name . ' = ' . $field->constDefaultValue . ';' . PHP_EOL;
-			$str .= Configuration::TAB(2) . 'return $this;' . PHP_EOL;
-			$str .= Configuration::TAB . '}' . PHP_EOL;
-			$this->editModel($str);
+			$str [] = ' * @method $this set' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $field->name))) . '(' .
+			          $field->commentDataTypeName . ' $' . $field->name . ');';
 		}
+		return join(PHP_EOL, $str);
 	}
 
 	private function createGetters()
 	{
+		$str = [];
+		/* @var $fields Tablefield[] */
 		foreach ($this->table->getFields() as $field) {
-			/* @var $field Tablefield */
-			$str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ';
-			$str .= '@return ' . $field->commentDataTypeName;
-			$str .= PHP_EOL . Configuration::TAB . ' */' . PHP_EOL;
-			$str .= Configuration::TAB . 'public function get' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $field->name))) . '(){' .
-			        PHP_EOL;
-			$str .= Configuration::TAB(2) . 'return $this->' . $field->name . ';' . PHP_EOL;
-			$str .= Configuration::TAB . '}' . PHP_EOL;
-			$this->editModel($str);
+			$str [] =
+				' * @method ' . $field->commentDataTypeName . ' get' . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $field->name))) .
+				'();';
 		}
+		return join(PHP_EOL, $str);
 	}
 
 	private function createConstructor()
 	{
-		$str =			Configuration::TAB . 'function __construct($conditions=FALSE){' . PHP_EOL . Configuration::TAB(2) .
-			'parent::__construct($conditions);' . PHP_EOL .
-			Configuration::TAB . '}' . PHP_EOL;
+		$str = Configuration::TAB . 'function __construct($conditions=FALSE){' . PHP_EOL . Configuration::TAB(2) .
+		       'parent::__construct($conditions);' . PHP_EOL .
+		       Configuration::TAB . '}' . PHP_EOL;
 		$this->editModel($str);
 	}
 
@@ -111,7 +194,8 @@ class Model
 			unlink($dir . $this->table->model . '.php');
 		}
 		$str = '<?php ' . PHP_EOL . PHP_EOL . 'namespace Database\\' . Configuration::dbNamespace() . ';' . PHP_EOL .
-		       PHP_EOL . 'use Database;' . PHP_EOL .
+		       PHP_EOL . 'use Database;' . PHP_EOL . PHP_EOL .
+		       '/**' . PHP_EOL . $this->createSetters() . PHP_EOL . $this->createGetters() . PHP_EOL . ' */' .
 		       PHP_EOL . 'class ' . $this->table->model . ' extends Database\DbActive{' . PHP_EOL . PHP_EOL;
 		$str .= Configuration::TAB . 'CONST TABLE_NAME = \'' . $this->table->name . '\';' . PHP_EOL;
 		$str .= Configuration::TAB . 'protected static $DETAILS = [' . implode(', ', $details) . '];' . PHP_EOL;
