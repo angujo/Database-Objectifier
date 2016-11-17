@@ -26,6 +26,8 @@ namespace Database;
 class DbActive
 {
 	CONST TABLE_NAME = '';
+	/** @var  $this */
+	private static $ME;
 
 	public function __construct($conditions = NULL)
 	{
@@ -68,7 +70,7 @@ class DbActive
 				}
 			}
 		}
-		if (method_exists('Database\CIModelAction', $name)) {
+		if (method_exists('Database\CIModelAction', $name) || is_callable(['Database\CIModelAction', $name])) {
 			if ('save' == $name) {
 				$id = CIModelAction::save(static::TABLE_NAME, get_object_vars($this));
 				if ($id && !$this->id) $this->id = $id;
@@ -91,5 +93,78 @@ class DbActive
 	protected function getClasses($conditions, $table, $class, $limit, $offSet)
 	{
 		return CIModelAction::getObjects($table, $conditions, $class, $limit, $offSet);
+	}
+
+	public static function findOne($condition)
+	{
+		self::$ME = new static();
+		if (($args = func_get_args()) && count($args)) {
+			if (1 == count($args)) {
+				if (is_array($args[0])) {
+					CIModelAction::where($args[0]);
+				} else {
+					CIModelAction::where('id', $args[0]);
+				}
+			} else call_user_func_array(['Database\CIModelAction', 'where'], $args);
+			self::$ME->init(CIModelAction::getOne(static::TABLE_NAME));
+		}
+		return self::$ME;
+	}
+
+	/**
+	 * @return static[]
+	 */
+	public static function findAll()
+	{
+		self::$ME = new static();
+		if (($args = func_get_args()) && count($args)) {
+			if (1 == count($args)) {
+				self::$ME->where('id', $args[0]);
+			} else call_user_func_array([self::$ME, 'where'], $args);
+		}
+		$className = get_class(self::$ME);
+		if (!$rows = CIModelAction::getAll(static::TABLE_NAME, 9999, 0)) return [];
+		return array_map(function ($row) use ($className) {
+			return (new $className($row));
+		}, $rows);
+	}
+
+	public static function find()
+	{
+		self::$ME = new static();
+		return self::$ME;
+	}
+
+	public static function one()
+	{
+		if (!self::$ME) return NULL;
+		self::$ME->init(CIModelAction::getOne(static::TABLE_NAME));
+		return self::$ME;
+	}
+
+	public static function all()
+	{
+		if (!self::$ME) return [];
+		$className = get_class(self::$ME);
+		if (!$rows = CIModelAction::getAll(static::TABLE_NAME, 9999, 0)) return [];
+		return array_map(function ($row) use ($className) {
+			return (new $className($row));
+		}, $rows);
+	}
+
+	public static function __callStatic($name, $arguments)
+	{
+		var_dump(func_get_args(), __FILE__);
+	}
+
+	/**
+	 * @param $id
+	 *
+	 * @return static
+	 */
+	public static function set($id)
+	{
+		self::$ME = new static();
+		return self::$ME->setId($id);
 	}
 }

@@ -102,7 +102,8 @@ class CIModelAction
 	public static function __callStatic($name, $arguments)
 	{
 		if (method_exists(self::$_DB, $name) && is_callable([self::$_DB, $name])) {
-			call_user_func_array([self::$_DB, $name], $arguments);
+			$res = call_user_func_array([self::$_DB, $name], $arguments);
+			if (!is_object($res)) return $res;
 		}
 		return new static();
 	}
