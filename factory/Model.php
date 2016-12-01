@@ -122,9 +122,8 @@ class Model
 		       '@param int $limit' . PHP_EOL . Configuration::TAB . ' * ' .
 		       '@param int $offset' . PHP_EOL . Configuration::TAB . ' * ' .
 		       '@return ' . $tblModel . '[]' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
-		       'function get' . $tblModel . '($limit = 100, $offset = 0){' .
+		       'function get' . $tblModel . '($limit = NULL, $offset = 0){' .
 		       PHP_EOL . Configuration::TAB(2) . 'if(!$this->' . $reference->referenced_column . ') return [];' .
-		       PHP_EOL . Configuration::TAB(2) . '$limit = (int)$limit;' .
 		       PHP_EOL . Configuration::TAB(2) . '$offset = (int)$offset;' .
 		       PHP_EOL . Configuration::TAB(2) . '$details = [];' .
 		       PHP_EOL . Configuration::TAB(2) . implode(PHP_EOL . Configuration::TAB(2), array_reverse($joins)) . PHP_EOL .

@@ -13,21 +13,27 @@ class CIModelAction
 {
 	public static $_DB;
 	public static $_ACTION_USER;
-
+	
 	public static function getOne($table)
 	{
 		$q = self::$_DB->get($table, 1);
 		if (!$q->num_rows()) return [];
 		return $q->row_array();
 	}
-
+	
+	public static function getCount($table)
+	{
+		return self::$_DB->count_all_results($table);
+	}
+	
 	public static function getAll($table, $limit = 100, $offset = 0)
 	{
-		$q = self::$_DB->get($table, (int)$limit, (int)$offset);
+		$limit = !is_numeric($limit) || 0 > $limit ? '18446744073709551615' : (int)$limit;
+		$q     = self::$_DB->get($table, $limit, (int)$offset);
 		if (!$q->num_rows()) return [];
 		return $q->result_array();
 	}
-
+	
 	public static function getObjects($table, array $dbConditions, $className, $limit = 100, $offset = 0)
 	{
 		if (!class_exists($className)) return [];
@@ -43,7 +49,7 @@ class CIModelAction
 			return (new $className($row));
 		}, $rows);
 	}
-
+	
 	public static function countObjects($table, array $dbConditions)
 	{
 		foreach ($dbConditions as $dbCondition) {
@@ -56,7 +62,7 @@ class CIModelAction
 		if (!$row = self::getOne($table)) return 0;
 		return isset($row['_c']) ? $row['_c'] : 0;
 	}
-
+	
 	public static function delete($tableName)
 	{
 		self::$_DB->delete($tableName);
@@ -65,29 +71,38 @@ class CIModelAction
 		}
 		return $aff;
 	}
-
-	public static function save($tableName, array $data)
+	
+	public static function save($tableName, array $data, &$id)
 	{
 		if (isset($data['id']) && trim($data['id']) && is_numeric($data['id'])) {
 			$id = $data['id'];
 			unset($data['id']);
 			return self::update($tableName, $id, $data);
 		}
-		return self::insert($tableName, $data);
+		return self::insert($tableName, $data, $id);
 	}
-
-	private static function insert($tableName, array $data)
+	
+	private static function insert($tableName, array $data, &$nID)
 	{
 		unset($data['id']);
 		self::$_DB->insert($tableName, $data);
-		$id  = self::$_DB->insert_id();
-		$res = (bool)$id;
+		$res = (bool)$nID = self::$_DB->insert_id();
 		if ($res) {
-			self::actionRegister($tableName, 'insert', $id);
+			self::actionRegister($tableName, 'insert', $nID);
 		}
 		return $res;
 	}
-
+	
+	public static function inUpdate($tableName, array $data)
+	{
+		self::$_DB->update($tableName, $data);
+		$res = self::$_DB->affected_rows();
+		if ($res) {
+			self::actionRegister($tableName, 'insert', $res);
+		}
+		return (bool)$res;
+	}
+	
 	private static function update($tableName, $id, array $data)
 	{
 		self::$_DB->where('id', $id);
@@ -96,9 +111,9 @@ class CIModelAction
 		if ($res) {
 			self::actionRegister($tableName, 'update', $id);
 		}
-		return $res;
+		return TRUE;
 	}
-
+	
 	public static function __callStatic($name, $arguments)
 	{
 		if (method_exists(self::$_DB, $name) && is_callable([self::$_DB, $name])) {
@@ -107,7 +122,7 @@ class CIModelAction
 		}
 		return new static();
 	}
-
+	
 	private static function actionRegister($tableName, $action, $id)
 	{
 		$table = preg_replace('/[^a-zA-Z0-9_]/', '', strtolower(self::$_DB->database . '_events'));
@@ -118,7 +133,7 @@ class CIModelAction
 				return;
 			}
 		}
-		self::$_DB->insert($table, array('action'     => $action, 'action_user' => (int)self::$_ACTION_USER, 'table_name' => $tableName,
-		                                 'event_date' => date('Y-m-d H:i:s'), 'row_id' => (int)@$id));
+		self::$_DB->insert($table, ['action'     => $action, 'action_user' => (int)self::$_ACTION_USER, 'table_name' => $tableName,
+		                            'event_date' => date('Y-m-d H:i:s'), 'row_id' => (int)@$id]);
 	}
 }
