@@ -17,6 +17,12 @@ class QueryBuilder
     protected $ORDER_BY       = [];
     protected $GROUP_BY       = [];*/
     
+    const COMPILE_FLAT    = 0;
+    const COMPILE_EQUATE  = 1;
+    const COMPILE_COLUMNS = 2;
+    const COMPILE_VALUES  = 3;
+    const COMPILE_BOTH    = 4;
+    
     public static $TABLE_REFERENCES = [];
     protected     $PRIMARY_TABLES   = [];
     
@@ -97,6 +103,13 @@ class QueryBuilder
         if (isset(self::$PARAMETERS[$str])) return $this->paramBinder();
         return $str;
     }
+    
+    protected function validVar($var)
+    {
+        return is_string($var) || is_numeric($var);
+    }
+    
+    public static function escape($s) { return (new self())->esc($s); }
     
     protected function esc($s)
     {

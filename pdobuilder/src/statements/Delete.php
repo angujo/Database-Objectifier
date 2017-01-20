@@ -9,24 +9,30 @@
 namespace pdobuilder\statement;
 
 use pdobuilder\clause\ClausesMerge;
+use pdobuilder\clause\QueryBuilder;
 
-class Read extends Query
+class Delete extends Query
 {
     private $statement = [];
     private $clauses;
+    private $alias     = NULL;
     
-    function __construct(ClausesMerge $clausesMerge)
+    function __construct(ClausesMerge $clausesMerge, $alias = NULL)
     {
+        $this->alias = (is_array($alias) ? implode(', ', array_filter($alias)) : (($alias && (is_string($alias) || is_numeric($alias))) ? $alias : NULL));
+        if ($this->alias) {
+            $this->alias = QueryBuilder::escape($this->alias);
+        }
         $this->clauses = $clausesMerge;
         $this->organizeStatement();
     }
     
     private function organizeStatement()
     {
-        $this->statement[] = 'SELECT';
-        $this->statement[] = $this->clauses->Select ?: '*';
-        $this->statement[] = 'FROM';
         if (!$this->clauses->PrimaryTable) throw new \Exception('Table must be defined!');
+        $this->statement[] = 'DELETE';
+        if ($this->alias) $this->statement[] = $this->alias;
+        $this->statement[] = 'FROM';
         $this->statement[] = $this->clauses->Join ? '(' . $this->clauses->PrimaryTable . ')' : $this->clauses->PrimaryTable;
         if ($this->clauses->Join) {
             $this->statement[] = $this->clauses->Join;

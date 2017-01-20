@@ -63,6 +63,10 @@ class PhpPdo
         }
     }
     
+    public function affectedRows() { return $this->STMT->rowCount(); }
+    
+    public function lastInsertID() { return self::$PDOs[$this->id]->lastInsertId(); }
+    
     public function query($sqlQuery, array $parameters = [], $className = '')
     {
         $this->class = '';

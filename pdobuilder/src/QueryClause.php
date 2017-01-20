@@ -8,8 +8,9 @@ namespace pdobuilder;
  */
 class QueryClause
 {
-    private $clauses = ['pdobuilder\clause\BetweenClause' => NULL, 'pdobuilder\clause\GroupByClause' => NULL, 'pdobuilder\clause\HavingClause' => NULL, 'pdobuilder\clause\LimitClause' => NULL,
-                        'pdobuilder\clause\OrderClause'   => NULL, 'pdobuilder\clause\SelectClause' => NULL, 'pdobuilder\clause\WhereClause' => NULL, 'pdobuilder\clause\JoinClause' => NULL];
+    private $clauses = ['pdobuilder\clause\BetweenClause'     => NULL, 'pdobuilder\clause\GroupByClause' => NULL, 'pdobuilder\clause\HavingClause' => NULL, 'pdobuilder\clause\LimitClause' => NULL,
+                        'pdobuilder\clause\OrderClause'       => NULL, 'pdobuilder\clause\SelectClause' => NULL, 'pdobuilder\clause\WhereClause' => NULL, 'pdobuilder\clause\JoinClause' => NULL,
+                        'pdobuilder\clause\ColumnValueClause' => NULL,];
     
     function __call($name, $arguments)
     {

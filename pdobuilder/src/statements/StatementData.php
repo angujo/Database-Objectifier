@@ -11,58 +11,17 @@ namespace pdobuilder\statement;
 
 class StatementData implements \ArrayAccess, \Iterator, \Countable
 {
-    private $cursor = -1;
-    private $data   = [];
+    private $data = [];
     
-    function __construct(array $fetchData)
-    {
-        $this->data = $fetchData;
-    }
+    function __construct(array $fetchData) { $this->data = $fetchData; }
     
-    private function variables()
-    {
-        $v = get_object_vars($this);
-        unset($v['cursor']);
-        return $v;
-    }
+    function data() { return $this->data; }
     
-    function data() { return $this->variables(); }
+    function first() { return reset($this->data); }
     
-    function firstRow()
-    {
-        if (!$this->variables()) return NULL;
-        if ($this->cursor == -1) $this->cursor = 0;
-        return $this->{'r0'};
-    }
+    function last() { return end($this->data); }
     
-    function lastRow()
-    {
-        $v = $this->variables();
-        if (!$v) return NULL;
-        return $v[(count($v) - 1)];
-    }
-    
-    function nextRow()
-    {
-        $v = $this->variables();
-        $this->cursor++;
-        if ($v && isset($v[$this->cursor])) {
-            return $v[$this->cursor];
-        }
-        $this->cursor--;
-        return NULL;
-    }
-    
-    function previousRow()
-    {
-        $v = $this->variables();
-        $this->cursor--;
-        if ($v && isset($v[$this->cursor])) {
-            return $v[$this->cursor];
-        }
-        $this->cursor++;
-        return NULL;
-    }
+    function previousRow() { return prev($this->data); }
     
     /**
      * Whether a offset exists

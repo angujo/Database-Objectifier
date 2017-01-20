@@ -8,7 +8,11 @@ namespace pdobuilder;
  * Time: 11:21 AM
  */
 use pdobuilder\clause\ClausesMerge;
+use pdobuilder\clause\QueryBuilder;
+use pdobuilder\statement\Delete;
+use pdobuilder\statement\Insert;
 use pdobuilder\statement\Read;
+use pdobuilder\statement\Update;
 
 /**
  * Class PdoBuilder
@@ -41,6 +45,31 @@ class PdoBuilder extends PDOObject
         return self::$SINGLE;
     }
     
+    function insertQuery($columnValues = [])
+    {
+        $this->CLAUSE->columnValue($columnValues);
+        $read         = new Insert((new ClausesMerge($this->CLAUSE, QueryBuilder::COMPILE_BOTH)));
+        $this->CLAUSE = NULL;
+        $q            = $read->getQuery();
+        return $q;
+    }
+    
+    function deleteQuery($aliases = NULL)
+    {
+        $read         = new Delete((new ClausesMerge($this->CLAUSE, QueryBuilder::COMPILE_EQUATE)), $aliases);
+        $this->CLAUSE = NULL;
+        $q            = $read->getQuery();
+        return $q;
+    }
+    
+    function updateQuery($columnValues = [])
+    {
+        $this->CLAUSE->columnValue($columnValues);
+        $read         = new Update((new ClausesMerge($this->CLAUSE, QueryBuilder::COMPILE_EQUATE)));
+        $this->CLAUSE = NULL;
+        $q            = $read->getQuery();
+        return $q;
+    }
     
     function selectQuery($clear = TRUE)
     {

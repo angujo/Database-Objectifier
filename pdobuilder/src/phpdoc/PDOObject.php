@@ -9,7 +9,9 @@ namespace pdobuilder;
  */
 use pdobuilder\clause\ClausesMerge;
 use pdobuilder\clause\QueryBuilder;
+use pdobuilder\statement\Delete;
 use pdobuilder\statement\Read;
+use pdobuilder\statement\Update;
 
 /**
  * Class PDOObject
@@ -46,6 +48,8 @@ use pdobuilder\statement\Read;
  * @method $this joinRight($table, $condition);
  * @method $this joinOuter($table, $condition);
  * @method $this joinInner($table, $condition);
+ * @method $this columnValue($column, $value = NULL, $escape = FALSE);
+ * @method $this tableColumnValue($tableName, $column, $value = NULL, $escape = FALSE);
  */
 class PDOObject
 {
@@ -66,6 +70,30 @@ class PDOObject
         } else throw new \Exception('Invalid connection Data Type!');
         $this->PDO    = new PhpPdo($_connections);
         $this->CLAUSE = new QueryClause();
+    }
+    
+    public function delete($aliases = NULL)
+    {
+        $delete           = new Delete((new ClausesMerge($this->CLAUSE)), $aliases);
+        $this->CLAUSE     = NULL;
+        $this->last_query = $delete->getQuery();
+        $this->PDO->query($delete->getRaw(), QueryBuilder::$PARAMETERS);
+        return $this->PDO->affectedRows();
+    }
+    
+    public function update($tableName = NULL, array $columns = [])
+    {
+        if ($tableName && is_array($tableName)) {
+            $columns = $tableName;
+        } elseif ($tableName && (is_string($tableName) || is_numeric($tableName))) {
+            $this->CLAUSE->table($tableName);
+        }
+        $this->CLAUSE->columnValue($columns);
+        $update           = new Update((new ClausesMerge($this->CLAUSE, QueryBuilder::COMPILE_EQUATE)));
+        $this->CLAUSE     = NULL;
+        $this->last_query = $update->getQuery();
+        $this->PDO->query($update->getRaw(), QueryBuilder::$PARAMETERS);
+        return $this->PDO->affectedRows();
     }
     
     private function reader()

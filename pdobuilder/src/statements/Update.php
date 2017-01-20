@@ -10,7 +10,7 @@ namespace pdobuilder\statement;
 
 use pdobuilder\clause\ClausesMerge;
 
-class Read extends Query
+class Update extends Query
 {
     private $statement = [];
     private $clauses;
@@ -23,14 +23,15 @@ class Read extends Query
     
     private function organizeStatement()
     {
-        $this->statement[] = 'SELECT';
-        $this->statement[] = $this->clauses->Select ?: '*';
-        $this->statement[] = 'FROM';
+        $this->statement[] = 'UPDATE';
         if (!$this->clauses->PrimaryTable) throw new \Exception('Table must be defined!');
         $this->statement[] = $this->clauses->Join ? '(' . $this->clauses->PrimaryTable . ')' : $this->clauses->PrimaryTable;
         if ($this->clauses->Join) {
             $this->statement[] = $this->clauses->Join;
         }
+        if (!$this->clauses->ColumnValue) throw new \Exception('Update parameters must be set!');
+        $this->statement[] = 'SET';
+        $this->statement[] = $this->clauses->ColumnValue;
         if ($this->clauses->Where) {
             $this->statement[] = 'WHERE';
             $this->statement[] = $this->clauses->Where;
