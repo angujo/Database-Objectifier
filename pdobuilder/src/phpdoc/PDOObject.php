@@ -18,6 +18,7 @@ use pdobuilder\statement\Update;
  * @method $this orderBy($column, $order = "ASC");
  * @method $this limit($length, $offset = 0);
  * @method $this select($column, $alias = NULL, $escape = TRUE);
+ * @method $this tableSelect($tableName, array $column);
  * @method $this table($tableName, $alias = NULL);
  * @method $this betweenDates($column, $min, $max);
  * @method $this orBetweenDates($column, $min, $max);

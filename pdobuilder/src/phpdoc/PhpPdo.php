@@ -86,6 +86,7 @@ class PhpPdo
     
     public function rows()
     {
-        return new StatementData($this->STMT->fetchAll($this->class ? \PDO::FETCH_CLASS : \PDO::FETCH_ASSOC));
+        if ($this->class) return new StatementData($this->STMT->fetchAll(\PDO::FETCH_CLASS, $this->class));
+        return new StatementData($this->STMT->fetchAll(\PDO::FETCH_ASSOC));
     }
 }

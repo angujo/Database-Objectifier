@@ -14,6 +14,17 @@ class SelectClause extends QueryBuilder implements StatementClause
 {
     private $SELECT = [];
     
+    public function tableSelect($tableName, array $columns)
+    {
+        foreach ($columns as $column => $alias) {
+            if (is_numeric($column)) {
+                $column = $alias;
+                $alias  = NULL;
+            }
+            $this->select($tableName . '.' . $column, $alias);
+        }
+    }
+    
     public function select()
     {
         $args = func_get_args();
