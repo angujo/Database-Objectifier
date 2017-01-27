@@ -12,22 +12,9 @@ use pdobuilder\PdoBuilder;
 
 /**
  * Class DbActive
- *
- * @package Database Yes
- *
- * @method $this where(string $column, string $value = NULL);
- * @method $this where_in(string $column, $value = []);
- * @method $this where_not_in(string $column, $value = []);
- * @method $this set(string $column, $value = NULL);
- * @method $this groupStart();
- * @method $this groupEnd();
- * @method $this order_by(string $column, string $order);
- * @method bool delete();
- * @method $this save(boolean $returnInstance = FALSE);
- * @method string lastQuery();
- * @method $this getAll(array $conditions, int $limitCount = 30, $offset = 0, array $search = []);
+ * @package Database
  */
-class DbActive
+abstract class DbActive
 {
     CONST TABLE_NAME = '';
     CONST DB_NAME    = '';
@@ -67,13 +54,15 @@ class DbActive
                 $this->$var = NULL;
             }
         }
-        if (TRUE === $DBLoad) {
-            foreach ($v as $column => $val) {
-                $this->PDOBuild->where($column, $val);
-            }
-        }
         foreach ($vars as $property => $val) {
             $this->{$property} = $val;
+        }
+        if (TRUE === $DBLoad) {
+            $v = get_object_vars($this);
+            foreach ($v as $column => $val) {
+                if (is_null($val)) continue;
+                $this->PDOBuild->where($column, $val);
+            }
         }
         return $this;
     }
@@ -118,14 +107,11 @@ class DbActive
      */
     public function one($conditions = NULL)
     {
-        $this->init($conditions);
-        if ($conditions) {
-            if (is_array($conditions)) $this->PDOBuild->where($conditions); else $this->PDOBuild->where('id', (int)$conditions);
-        }
+        $this->init($conditions, FALSE, TRUE);
         /** @var array $d */
         $d = $this->PDOBuild->limit(1)->table(static::TABLE_NAME)->getOne();
-        $this->init($d,FALSE);
-        return $this;
+        $this->init($d, FALSE);
+        return $d ? $this : NULL;
     }
     
     /**
@@ -142,6 +128,44 @@ class DbActive
         return $d;
     }
     
+    /**
+     * @param array|int|null $variables
+     *
+     * @return int
+     */
+    public function insert($variables = NULL)
+    {
+        
+        $this->id = NULL;
+        $this->init($variables, TRUE, FALSE);
+        $id       = $this->PDOBuild->table(self::TABLE_NAME)->insert(array_filter(get_object_vars($this)));
+        $this->id = $id;
+        return $id;
+    }
+    
+    /**
+     * @param array|int|null $conditions
+     *
+     * @return int
+     */
+    public function delete($conditions = NULL)
+    {
+        if (!isset($this->id) || !$this->id || !$this->one($conditions)) return 0;
+        $this->init($conditions, TRUE, TRUE);
+        return $this->PDOBuild->table(self::TABLE_NAME)->delete();
+    }
+    
+    /**
+     * @param array|int|null $conditions
+     *
+     * @return int
+     */
+    public function update($conditions = NULL)
+    {
+        if (!isset($this->id) || !$this->id || !$this->one($conditions)) return 0;
+        $this->init($conditions, TRUE, TRUE);
+        return $this->PDOBuild->table(self::TABLE_NAME)->update();
+    }
     
     /**
      * @param array $updates

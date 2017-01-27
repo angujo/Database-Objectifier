@@ -10,6 +10,7 @@ namespace pdobuilder;
 use pdobuilder\clause\ClausesMerge;
 use pdobuilder\clause\QueryBuilder;
 use pdobuilder\statement\Delete;
+use pdobuilder\statement\Insert;
 use pdobuilder\statement\Read;
 use pdobuilder\statement\Update;
 
@@ -71,6 +72,16 @@ class PDOObject
         } else throw new \Exception('Invalid connection Data Type!');
         $this->PDO    = new PhpPdo($_connections);
         $this->CLAUSE = new QueryClause();
+    }
+    
+    public function insert($columnValues = [])
+    {
+        $this->CLAUSE->columnValue($columnValues);
+        $insert           = new Insert((new ClausesMerge($this->CLAUSE, QueryBuilder::COMPILE_BOTH)));
+        $this->CLAUSE     = NULL;
+        $this->last_query = $insert->getQuery();
+        $this->PDO->query($insert->getRaw(), QueryBuilder::$PARAMETERS);
+        return $this->PDO->affectedRows();
     }
     
     public function delete($aliases = NULL)
