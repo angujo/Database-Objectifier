@@ -114,6 +114,7 @@ class PDOObject
         $q                = $this->READ->getRaw();
         $this->last_query = $this->READ->getQuery();
         $this->CLAUSE     = NULL;
+        $this->READ       = NULL;
         return $q;
     }
     

@@ -24,7 +24,7 @@ class ColumnValueClause extends QueryBuilder implements StatementClause
     public function columnValue($column, $value = NULL, $escape = FALSE)
     {
         if (is_array($column)) {
-            $column = array_filter($column, function ($c) { return strlen(trim($c)); });
+            $column = array_filter($column, function ($c) { return (is_string($c) || is_numeric($c)) && strlen(trim($c)); });
             if (!$column) return $this;
             foreach ($column as $c => $item) {
                 if (is_array($item)) {

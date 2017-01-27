@@ -9,6 +9,7 @@
 namespace Database;
 
 use pdobuilder\PdoBuilder;
+use pdobuilder\statement\StatementData;
 
 /**
  * Class DbActive
@@ -18,6 +19,8 @@ abstract class DbActive
 {
     CONST TABLE_NAME = '';
     CONST DB_NAME    = '';
+    
+    private static $ignoreVars = ['pdobuild', 'details'];
     
     /** @var \pdobuilder\PdoBuilder */
     protected $PDOBuild;
@@ -31,6 +34,8 @@ abstract class DbActive
         $this->init($conditions);
     }
     
+    public function lastQuery() { return $this->PDOBuild->lastQuery(); }
+    
     /**
      * @param array $details
      *
@@ -38,29 +43,36 @@ abstract class DbActive
      *
      * @param bool  $DBLoad
      *
+     * @param bool  $exclusive
+     *
      * @return $this
      */
-    public function init(array $details, $append = TRUE, $DBLoad = FALSE)
+    public function init($details, $append = TRUE, $DBLoad = FALSE, $exclusive = FALSE)
     {
+        $details = is_array($details) ? array_filter($details) : $details;
         if ($details) {
             if (!is_array($details)) {
                 $details = ['id' => (int)$details];
             }
         }
-        $v    = get_object_vars($this);
-        $vars = array_intersect_key($details, $v);
-        if (TRUE !== $append) {
-            foreach ($v as $var => $val) {
-                $this->$var = NULL;
+        if (is_array($details) && $details) {
+            $v    = get_object_vars($this);
+            $vars = array_intersect_key($details, $v);
+            if (TRUE !== $append) {
+                foreach ($v as $var => $val) {
+                    if (in_array(strtolower(trim($var)), self::$ignoreVars)) continue;
+                    $this->$var = NULL;
+                }
+            }
+            foreach ($vars as $property => $val) {
+                if (in_array(strtolower(trim($property)), self::$ignoreVars)) continue;
+                $this->{$property} = $val;
             }
         }
-        foreach ($vars as $property => $val) {
-            $this->{$property} = $val;
-        }
         if (TRUE === $DBLoad) {
-            $v = get_object_vars($this);
+            $v = $exclusive ? (is_array($details) ? $details : []) : get_object_vars($this);
             foreach ($v as $column => $val) {
-                if (is_null($val)) continue;
+                if (is_null($val) || in_array(strtolower(trim($column)), self::$ignoreVars)) continue;
                 $this->PDOBuild->where($column, $val);
             }
         }
@@ -96,7 +108,7 @@ abstract class DbActive
      */
     public function count($conditions = [])
     {
-        $this->init($conditions, FALSE, TRUE);
+        $this->init($conditions, FALSE, TRUE, TRUE);
         return $this->PDOBuild->table(static::TABLE_NAME)->count();
     }
     
@@ -115,13 +127,15 @@ abstract class DbActive
     }
     
     /**
-     * @param null $limit
-     * @param int  $start
+     * @param array $conditions
+     * @param null  $limit
+     * @param int   $start
      *
-     * @return static[]
+     * @return \pdobuilder\statement\StatementData|static[]
      */
-    public function all($limit = NULL, $start = 0)
+    public function all($conditions = [], $limit = NULL, $start = 0)
     {
+        $this->PDOBuild->where($conditions);
         if (!is_null($limit) && is_numeric($limit)) $this->PDOBuild->limit((int)$limit, (int)$start);
         /** @var static[] $d */
         $d = $this->PDOBuild->table(static::TABLE_NAME)->getAll(get_class(new static()));
@@ -135,10 +149,9 @@ abstract class DbActive
      */
     public function insert($variables = NULL)
     {
-        
         $this->id = NULL;
         $this->init($variables, TRUE, FALSE);
-        $id       = $this->PDOBuild->table(self::TABLE_NAME)->insert(array_filter(get_object_vars($this)));
+        $id       = $this->PDOBuild->table(static::TABLE_NAME)->insert(array_filter(get_object_vars($this)));
         $this->id = $id;
         return $id;
     }
@@ -150,9 +163,31 @@ abstract class DbActive
      */
     public function delete($conditions = NULL)
     {
-        if (!isset($this->id) || !$this->id || !$this->one($conditions)) return 0;
+        if (((!isset($this->id) || !$this->id) && ((!is_array($conditions) && !is_numeric($conditions)) || (is_array($conditions) && !isset($conditions['id'])))) || !$this->one($conditions)) return 0;
         $this->init($conditions, TRUE, TRUE);
-        return $this->PDOBuild->table(self::TABLE_NAME)->delete();
+        return $this->PDOBuild->table(static::TABLE_NAME)->delete();
+    }
+    
+    public function softDelete(array $conditions, $identifierColumn = 'id')
+    {
+        $identifierColumn = !is_string($identifierColumn) ? 'id' : $identifierColumn;
+        $entries          = $this->PDOBuild->where($conditions)->table(static::TABLE_NAME)->getAll();
+        $c                = 0;
+        if ($entries->count()) {
+            foreach ($entries as $entry) {
+                $d               = [];
+                $d['data']       = json_encode($entry);
+                $d['name']       = isset($entry[$identifierColumn]) ? $entry[$identifierColumn] : 'id';
+                $d['dated']      = date('Y-m-d H:i:s');
+                $d['table_name'] = static::TABLE_NAME;
+                $d['actionby']   = 1;
+                if ($this->PDOBuild->table('trash')->insert($d)) {
+                    $c++;
+                    $this->PDOBuild->table(static::TABLE_NAME)->where('id', $entry['id'])->delete();
+                }
+            }
+        }
+        return (bool)$c;
     }
     
     /**
@@ -164,7 +199,7 @@ abstract class DbActive
     {
         if (!isset($this->id) || !$this->id || !$this->one($conditions)) return 0;
         $this->init($conditions, TRUE, TRUE);
-        return $this->PDOBuild->table(self::TABLE_NAME)->update();
+        return $this->PDOBuild->table(static::TABLE_NAME)->update();
     }
     
     /**

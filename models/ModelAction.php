@@ -1,7 +1,5 @@
 <?php
 namespace Database;
-
-require_once 'DbExtend.php';
 require_once 'DbActive.php';
 
 /**
@@ -221,12 +219,4 @@ class DBOStatus
 	static $OK    = TRUE;
 	static $ERROR = '';
 	static $RESULT;
-}
-
-$dirs = glob(dirname(__FILE__) . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
-foreach ($dirs as $dir) {
-	$files = glob($dir . DIRECTORY_SEPARATOR . '*.{php}', GLOB_BRACE);
-	foreach ($files as $file) {
-		require_once $file;
-	}
 }
