@@ -6,6 +6,15 @@
  * Time: 04:12 PM
  */
 $config            = [];
+$config['setting'] = [
+    'type'        => 'mysql',//mysql | mssql
+    'host'        => 'localhost',
+    'port'        => '',
+    'unix_socket' => '',
+    'charset'     => 'utf8',
+    'username'    => 'root',
+    'password'    => 'root',
+];
 $config['default'] = [
     'type'        => 'mysql',//mysql | mssql
     'host'        => 'localhost',

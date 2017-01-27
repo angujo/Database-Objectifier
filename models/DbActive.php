@@ -8,6 +8,8 @@
 
 namespace Database;
 
+use pdobuilder\PdoBuilder;
+
 /**
  * Class DbActive
  *
@@ -27,212 +29,133 @@ namespace Database;
  */
 class DbActive
 {
-	CONST TABLE_NAME = '';
-	/** @var  $this */
-	private static $ME;
-	
-	public function __construct($conditions = NULL)
-	{
-		if (NULL === $conditions) return;
-		if (is_array($conditions)) {
-			$this->init($conditions);
-		} elseif ($conditions) {
-			$this->init(CIModelAction::where('id', (int)$conditions)->getOne(static::TABLE_NAME));
-		}
-	}
-	
-	/**
-	 * @param array $details
-	 * @param bool  $update
-	 *
-	 * @return $this
-	 */
-	public function init(array $details, $update = FALSE)
-	{
-		if (FALSE !== $update) {
-			foreach ($this as $key => $val) {
-				$this->{$key} = NULL;
-			}
-		}
-		$vars = array_intersect_key($details, get_object_vars($this));
-		foreach ($vars as $property => $val) {
-			$this->{$property} = $val;
-		}
-		return $this;
-	}
-	
-	function __call($name, $arguments)
-	{
-		$sub = substr($name, 0, 3);
-		if (in_array($sub, ['set', 'get']) && 3 < strlen($name)) {
-			foreach ($this as $prop => $val) {
-				$func = $sub . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $prop)));
-				if ($name == $func) {
-					if ('get' == $sub) {
-						return $val;
-					}
-					if ('set' == $sub) {
-						if (1 <= count($arguments)) {
-							$this->{$prop} = $arguments[0];
-						}
-						return $this;
-					}
-				}
-			}
-		}
-		if (method_exists('Database\CIModelAction', $name) || is_callable(['Database\CIModelAction', $name])) {
-			if ('save' == $name) {
-				$id = 0;
-				CIModelAction::save(static::TABLE_NAME, get_object_vars($this), $id);
-				if ($id && !$this->id) $this->id = $id;
-				return $id;
-			}
-			if ('delete' == $name && CIModelAction::where('id', $this->id)->delete(static::TABLE_NAME)) {
-				return NULL;
-			}
-			$ciR = forward_static_call_array(['Database\CIModelAction', $name], $arguments);
-			if (!is_object($ciR)) return $ciR;
-			return $this;
-		}
-		return NULL;
-	}
-	
-	/**
-	 * @param $conditions
-	 * @param $table
-	 *
-	 * @return int
-	 */
-	protected function countClasses($conditions, $table)
-	{
-		return CIModelAction::countObjects($table, $conditions);
-	}
-	
-	protected function getClasses($conditions, $table, $class, $limit, $offSet)
-	{
-		return CIModelAction::getObjects($table, $conditions, $class, $limit, $offSet);
-	}
-	
-	/**
-	 * @param $condition
-	 *
-	 * @return null|static
-	 */
-	public static function findOne($condition)
-	{
-		self::$ME = new static();
-		if (($args = func_get_args()) && count($args)) {
-			if (1 == count($args)) {
-				if (is_array($args[0])) {
-					CIModelAction::where($args[0]);
-				} else {
-					CIModelAction::where('id', $args[0]);
-				}
-			} else call_user_func_array(['Database\CIModelAction', 'where'], $args);
-			self::$ME->init(CIModelAction::getOne(static::TABLE_NAME));
-		}
-		return self::$ME->id ? self::$ME : NULL;
-	}
-	
-	/**
-	 * @return static[]
-	 */
-	public static function findAll()
-	{
-		self::$ME = new static();
-		if (($args = func_get_args()) && count($args)) {
-			if (1 == count($args)) {
-				if (is_array($args[0])) {
-					CIModelAction::where($args[0]);
-				} else {
-					self::$ME->where('id', $args[0]);
-				}
-			} else call_user_func_array([self::$ME, 'where'], $args);
-		}
-		$className = get_class(self::$ME);
-		if (!$rows = CIModelAction::getAll(static::TABLE_NAME, 9999, 0)) return [];
-		return array_map(function ($row) use ($className) {
-			return (new $className($row));
-		}, $rows);
-	}
-	
-	/**
-	 * @return static
-	 */
-	public static function find()
-	{
-		self::$ME = new static();
-		return self::$ME;
-	}
-	
-	/**
-	 * @return static
-	 */
-	public static function one()
-	{
-		if (!self::$ME) return NULL;
-		self::$ME->init(CIModelAction::getOne(static::TABLE_NAME));
-		return self::$ME;
-	}
-	
-	/**
-	 * @return int
-	 */
-	public static function count()
-	{
-		if (!self::$ME) return NULL;
-		return CIModelAction::getCount(static::TABLE_NAME);
-	}
-	
-	/**
-	 * @return bool|null
-	 */
-	public function exists()
-	{
-		if (!self::$ME) return NULL;
-		return 0 < CIModelAction::getCount(static::TABLE_NAME);
-	}
-	
-	/**
-	 * @param null $limit
-	 * @param int  $start
-	 *
-	 * @return static[]
-	 */
-	public static function all($limit = NULL, $start = 0)
-	{
-		if (!self::$ME) return [];
-		$className = get_class(self::$ME);
-		$limit     = (int)!is_numeric($limit) ? 9999 : $limit;
-		if (!$rows = CIModelAction::getAll(static::TABLE_NAME, $limit, (int)$start)) return [];
-		return array_map(function ($row) use ($className) {
-			return (new $className($row));
-		}, $rows);
-	}
-	
-	public static function __callStatic($name, $arguments)
-	{
-		var_dump(func_get_args(), __FILE__);
-	}
-	
-	/**
-	 * @param $id
-	 *
-	 * @return static
-	 */
-	public static function setPK($id)
-	{
-		self::$ME = new static();
-		return self::$ME->setId($id);
-	}
-	
-	/**
-	 * @param array $updates
-	 *
-	 * @return bool
-	 */
-	public static function updateAll(array $updates = [])
-	{
-		return CIModelAction::inUpdate(static::TABLE_NAME, $updates);
-	}
+    CONST TABLE_NAME = '';
+    CONST DB_NAME    = '';
+    
+    /** @var \pdobuilder\PdoBuilder */
+    protected $PDOBuild;
+    
+    public function __construct($conditions = NULL)
+    {
+        $connections           = include dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'pdobuilder' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'conf.php';
+        $connections           = $connections['setting'];
+        $connections['dbname'] = static::DB_NAME;
+        $this->PDOBuild        = new PdoBuilder($connections);
+        $this->init($conditions);
+    }
+    
+    /**
+     * @param array $details
+     *
+     * @param bool  $append
+     *
+     * @param bool  $load
+     *
+     * @return $this
+     */
+    public function init(array $details, $append = TRUE, $load = FALSE)
+    {
+        if ($details) {
+            if (!is_array($details)) {
+                $details = ['id' => (int)$details];
+            }
+        }
+        $v    = get_object_vars($this);
+        $vars = array_intersect_key($details, $v);
+        if (TRUE !== $append) {
+            foreach ($v as $var => $val) {
+                $this->$var = NULL;
+            }
+        }
+        if (TRUE === $load) {
+            foreach ($v as $column => $val) {
+                $this->PDOBuild->where($column, $val);
+            }
+        }
+        foreach ($vars as $property => $val) {
+            $this->{$property} = $val;
+        }
+        return $this;
+    }
+    
+    function __call($name, $arguments)
+    {
+        $sub = substr($name, 0, 3);
+        if (in_array($sub, ['set', 'get']) && 3 < strlen($name)) {
+            foreach ($this as $prop => $val) {
+                $func = $sub . str_ireplace(' ', '', ucwords(str_ireplace('_', ' ', $prop)));
+                if ($name == $func) {
+                    if ('get' == $sub) {
+                        return $val;
+                    }
+                    if ('set' == $sub) {
+                        if (1 <= count($arguments)) {
+                            $this->{$prop} = $arguments[0];
+                        }
+                        return $this;
+                    }
+                }
+            }
+        }
+        return NULL;
+    }
+    
+    /**
+     * @param $conditions
+     * @param $table
+     *
+     * @return int
+     */
+    protected function countClasses($conditions, $table)
+    {
+        return CIModelAction::countObjects($table, $conditions);
+    }
+    
+    /**
+     * @param array|int|null $conditions
+     *
+     * @return static
+     */
+    public function one($conditions = NULL)
+    {
+        $this->init($conditions);
+        if ($conditions) {
+            if (is_array($conditions)) $this->PDOBuild->where($conditions); else $this->PDOBuild->where('id', (int)$conditions);
+        }
+        /** @var static $d */
+        $d = $this->PDOBuild->limit(1)->table(static::TABLE_NAME)->getOne(get_class($this));
+        return $d;
+    }
+    
+    /**
+     * @param null $limit
+     * @param int  $start
+     *
+     * @return static[]
+     */
+    public function all($limit = NULL, $start = 0)
+    {
+        if (!is_null($limit) && is_numeric($limit)) $this->PDOBuild->limit((int)$limit, (int)$start);
+        /** @var static[] $d */
+        $d = $this->PDOBuild->table(static::TABLE_NAME)->getAll(get_class(new static()));
+        return $d;
+    }
+    
+    
+    /**
+     * @param array $updates
+     *
+     * @param array $conditions
+     *
+     * @return int
+     */
+    public function updateAll(array $updates, $conditions = [])
+    {
+        return $this->PDOBuild->columnValue($updates)->where($conditions)->update(static::TABLE_NAME);
+    }
+    
+    public static function model($pk = NULL)
+    {
+        return new static($pk);
+    }
 }
