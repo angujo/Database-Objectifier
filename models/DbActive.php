@@ -49,11 +49,11 @@ class DbActive
      *
      * @param bool  $append
      *
-     * @param bool  $load
+     * @param bool  $DBLoad
      *
      * @return $this
      */
-    public function init(array $details, $append = TRUE, $load = FALSE)
+    public function init(array $details, $append = TRUE, $DBLoad = FALSE)
     {
         if ($details) {
             if (!is_array($details)) {
@@ -67,7 +67,7 @@ class DbActive
                 $this->$var = NULL;
             }
         }
-        if (TRUE === $load) {
+        if (TRUE === $DBLoad) {
             foreach ($v as $column => $val) {
                 $this->PDOBuild->where($column, $val);
             }
@@ -102,13 +102,13 @@ class DbActive
     
     /**
      * @param $conditions
-     * @param $table
      *
      * @return int
      */
-    protected function countClasses($conditions, $table)
+    public function count($conditions = [])
     {
-        return CIModelAction::countObjects($table, $conditions);
+        $this->init($conditions, FALSE, TRUE);
+        return $this->PDOBuild->table(static::TABLE_NAME)->count();
     }
     
     /**
@@ -122,9 +122,10 @@ class DbActive
         if ($conditions) {
             if (is_array($conditions)) $this->PDOBuild->where($conditions); else $this->PDOBuild->where('id', (int)$conditions);
         }
-        /** @var static $d */
-        $d = $this->PDOBuild->limit(1)->table(static::TABLE_NAME)->getOne(get_class($this));
-        return $d;
+        /** @var array $d */
+        $d = $this->PDOBuild->limit(1)->table(static::TABLE_NAME)->getOne();
+        $this->init($d,FALSE);
+        return $this;
     }
     
     /**

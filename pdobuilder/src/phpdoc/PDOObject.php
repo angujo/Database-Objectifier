@@ -112,7 +112,7 @@ class PDOObject
         $this->CLAUSE->select('COUNT(*) numrows');
         $this->CLAUSE->limit(1);
         $this->PDO->query($this->reader(), QueryBuilder::$PARAMETERS);
-        $r = $this->PDO->firstRow();
+        $r = $this->PDO->rows()->first();
         return (int)@$r['numrows'];
     }
     
@@ -125,14 +125,14 @@ class PDOObject
     function columns()
     {
         if (!$this->READ) return [];
-        return array_keys($this->PDO->firstRow() ?: []);
+        return array_keys($this->PDO->rows()->first() ?: []);
     }
     
     function getOne($className = '')
     {
         $this->CLAUSE->limit(1);
         $this->PDO->query($this->reader(), QueryBuilder::$PARAMETERS, $className);
-        return $this->PDO->firstRow();
+        return $this->PDO->rows()->first();
     }
     
     function getAll($className = '')
