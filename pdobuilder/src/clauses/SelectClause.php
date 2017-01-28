@@ -14,6 +14,12 @@ class SelectClause extends QueryBuilder implements StatementClause
 {
     private $SELECT = [];
     
+    public function distinct()
+    {
+        if ($this->SELECT && 0 == strcasecmp('distinct', $this->SELECT[0])) return;
+        array_unshift($this->SELECT, 'DISTINCT');
+    }
+    
     public function tableSelect($tableName, array $columns)
     {
         foreach ($columns as $column => $alias) {
@@ -113,6 +119,8 @@ class SelectClause extends QueryBuilder implements StatementClause
         if (empty($this->SELECT)) {
             return '*';
         } else {
+            if (1 == count($this->SELECT) && 0 == strcasecmp('distinct', $this->SELECT[0])) $this->SELECT[0] = 'DISTINCT *';
+            if (0 == strcasecmp('distinct', $this->SELECT[0])) $this->SELECT[0] = 'DISTINCT ' . $this->SELECT[0];
             return implode(', ', array_map(function ($s) { return trim($s); }, $this->SELECT));
         }
     }

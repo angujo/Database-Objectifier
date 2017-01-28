@@ -9,7 +9,10 @@ namespace pdobuilder\clause;
  */
 class WhereClause extends QueryBuilder implements StatementClause
 {
-    private $WHERE = [];
+    private        $WHERE       = [];
+    private static $LIKE_BOTH   = 0;
+    private static $LIKE_BEFORE = 1;
+    private static $LIKE_AFTER  = 2;
     
     public function groupStart()
     {
@@ -32,12 +35,12 @@ class WhereClause extends QueryBuilder implements StatementClause
     public function where($column, $value = FALSE, $comparison = '=')
     {
         $args = func_get_args();
-        array_unshift($args, FALSE);
+        array_unshift($args, self::$LIKE_BOTH, FALSE);
         call_user_func_array([$this, '_where'], $args);
         return $this;
     }
     
-    private function _where($isOr, $column, $value = FALSE, $comparison = '=')
+    private function _where($likePosition, $isOr, $column, $value = FALSE, $comparison = '=')
     {
         if (is_array($column) || is_array($value)) {
             call_user_func_array([$this, 'arrayWhere'], func_get_args());
@@ -48,16 +51,16 @@ class WhereClause extends QueryBuilder implements StatementClause
             if ($isOr) $this->orWhereNull($column); else $this->whereNull($column);
         } else {
             if (0 == strcasecmp($comparison, 'like') || 0 == strcasecmp($comparison, 'not like')) {
-                $value = '%' . $value . '%';
+                $value = ($likePosition == self::$LIKE_AFTER ? '' : '%') . $value . ($likePosition == self::$LIKE_BEFORE ? '' : '%');
             }
             $this->addWhere($column, $comparison . ' ' . $this->valueBind($value), $isOr);
         }
     }
     
-    private function arrayWhere($isOR, $column, $value = FALSE, $comparison = '=')
+    private function arrayWhere($likePosition, $isOR, $column, $value = FALSE, $comparison = '=')
     {
         $args = func_get_args();
-        if (is_array($column) && 2 == count($args)) {
+        if (is_array($column) && 3 == count($args)) {
             foreach ($column as $col => $val) {
                 if (is_string($col)) {
                     if ($isOR) $this->orWhere($col, $val); else $this->where($col, $val);
@@ -66,11 +69,12 @@ class WhereClause extends QueryBuilder implements StatementClause
                     if ($isOR) $this->orWhere($val[0], $val[1], $val[2]); else $this->where($val[0], $val[1], $val[2]);
                 }
             }
-        } elseif (is_array($column) && 3 <= count($args) && (is_string($value) || is_numeric($value))) {
+        } elseif (is_array($column) && 4 <= count($args) && (is_string($value) || is_numeric($value))) {
             $comparison = strtolower(trim($comparison));
             if (0 == strcasecmp($comparison, 'like') || 0 == strcasecmp($comparison, 'not like')) {
+                $value  = ($likePosition == self::$LIKE_AFTER ? '' : '%') . $value . ($likePosition == self::$LIKE_BEFORE ? '' : '%');
                 $column = 'CONCAT(' . implode(', ', array_filter($column, function ($c) { return is_string($c); })) . ')';
-                $value  = ((0 == strcasecmp($comparison, 'like')) ? 'LIKE' : 'NOT LIKE') . ' ' . $this->valueBind('%' . $value . '%');
+                $value  = ((0 == strcasecmp($comparison, 'like')) ? 'LIKE' : 'NOT LIKE') . ' ' . $this->valueBind( $value );
                 $this->addWhere($column, $value, $isOR);
             } else {
                 $this->addWhere($this->valueBind($value), 'IN (' . implode(', ', $column) . ')', $isOR);
@@ -117,7 +121,7 @@ class WhereClause extends QueryBuilder implements StatementClause
     public function orWhere($column, $value = FALSE, $comparison = '=')
     {
         $args = func_get_args();
-        array_unshift($args, TRUE);
+        array_unshift($args, self::$LIKE_BOTH, TRUE);
         call_user_func_array([$this, '_where'], $args);
         return $this;
     }
@@ -161,9 +165,30 @@ class WhereClause extends QueryBuilder implements StatementClause
         $this->WHERE[] = [$isOR ? 'OR' : 'AND', $this->whereColumn($column) . ' ' . $condition];
     }
     
-    public function like($column, $value)
+    public function like($column, $value = NULL, $position = 'both')
     {
-        $args = func_get_args();
+        return $this->_like(('before' == $position ? self::$LIKE_BEFORE : ('after' == $position ? self::$LIKE_AFTER : self::$LIKE_BOTH)), FALSE, $column, $value, 'like');
+    }
+    
+    public function orLike($column, $value = NULL, $position = 'both')
+    {
+        return $this->_like(('before' == $position ? self::$LIKE_BEFORE : ('after' == $position ? self::$LIKE_AFTER : self::$LIKE_BOTH)), TRUE, $column, $value, 'like');
+    }
+    
+    public function notLike($column, $value = NULL, $position = 'both')
+    {
+        return $this->_like(('before' == $position ? self::$LIKE_BEFORE : ('after' == $position ? self::$LIKE_AFTER : self::$LIKE_BOTH)), FALSE, $column, $value, 'not like');
+    }
+    
+    public function orNotLike($column, $value = NULL, $position = 'both')
+    {
+        return $this->_like(('before' == $position ? self::$LIKE_BEFORE : ('after' == $position ? self::$LIKE_AFTER : self::$LIKE_BOTH)), TRUE, $column, $value, 'not like');
+    }
+    
+    private function _like($position, $isOR, $column, $value = FALSE, $comparison = 'like')
+    {
+        call_user_func_array([$this, '_where'], func_get_args());
+        return $this;
     }
     
     public function getClause()

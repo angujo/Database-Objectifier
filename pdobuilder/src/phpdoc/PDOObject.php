@@ -18,6 +18,7 @@ use pdobuilder\statement\Update;
  * Class PDOObject
  * @method $this orderBy($column, $order = "ASC");
  * @method $this limit($length, $offset = 0);
+ * @method $this distinct();
  * @method $this select($column, $alias = NULL, $escape = TRUE);
  * @method $this tableSelect($tableName, array $column);
  * @method $this table($tableName, $alias = NULL);
@@ -45,6 +46,10 @@ use pdobuilder\statement\Update;
  * @method $this whereNotNull($column);
  * @method $this whereIn($column, array $values = NULL);
  * @method $this whereNotIn($column, array $values = NULL);
+ * @method $this like($column, $values = NULL, $position = 'both');
+ * @method $this orLike($column, $values = NULL, $position = 'both');
+ * @method $this notLike($column, $values = NULL, $position = 'both');
+ * @method $this orNotLike($column, $values = NULL, $position = 'both');
  * @method $this join($table, $condition, $joinType = 'LEFT');
  * @method $this joinLeft($table, $condition);
  * @method $this joinRight($table, $condition);
