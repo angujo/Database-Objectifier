@@ -43,7 +43,7 @@ class Tablefield
 			$this->required = TRUE;
 		}
 		$this->comment      = $details['Comment'];
-		$this->label        = trim($this->comment) ?: ucwords(trim(preg_replace('/[^a-zA-Z0-9]/', ' ', $this->name)));
+		$this->label        = addslashes(trim($this->comment) ?: ucwords(trim(preg_replace('/[^a-zA-Z0-9]/', ' ', $this->name))));
 		$this->defaultValue = $details['Default'];
 		$this->unique       = 'uni' == trim(strtolower($details['Key']));
 		$this->setDefaultValue();

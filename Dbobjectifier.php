@@ -160,7 +160,7 @@ class Dbobjectifier
             }*/
         }
         echo '<pre>';
-        print_r($this->tableReferences);
+        //print_r($this->tableReferences);
         //var_dump($this->tableReferences);
         echo '</pre>';
     }

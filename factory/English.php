@@ -81,7 +81,7 @@ class English
         'money',
         'rice',
         'information',
-        'equipment',
+        'equipment', 'status',
     ];
     
     public static function pluralize($string)
@@ -144,5 +144,12 @@ class English
         $name = str_ireplace(' ', '', (ucwords(str_replace('_', ' ', $name))));
         if ($lowerCaseFirst) $name[0] = strtolower($name[0]);
         return $name;
+    }
+    
+    public static function entityName($rawName, $singular = TRUE)
+    {
+        $rawName                      = explode(' ', preg_replace('/[^0-9a-zA-Z]/', ' ', $rawName));
+        $rawName[count($rawName) - 1] = $singular ? self::singularize($rawName[count($rawName) - 1]) : self::pluralize($rawName[count($rawName) - 1]);
+        return str_ireplace(' ', '', ucwords(implode(' ', $rawName)));
     }
 }

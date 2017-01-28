@@ -11,32 +11,35 @@
  *
  * @author bangujo
  */
-class Table {
-
-    public $name = '';
-    private $fields = array();
-    public $model = '';
-    public $comment = '';
-    public $typeView = false;
-
-	/**
-	 * Table constructor.
-	 *
-	 * @param string $name
-	 * @param Tablefield[]  $fields
-	 * @param string $type
-	 */
-    public function __construct($name = '', array $fields = array(), $type = '') {
-        $this->name = $name;
+class Table
+{
+    
+    public  $name     = '';
+    private $fields   = [];
+    public  $model    = '';
+    public  $comment  = '';
+    public  $typeView = FALSE;
+    
+    /**
+     * Table constructor.
+     *
+     * @param string       $name
+     * @param Tablefield[] $fields
+     * @param string       $type
+     */
+    public function __construct($name = '', array $fields = [], $type = '')
+    {
+        $this->name     = $name;
         $this->typeView = 'view' == trim(strtolower($type));
-        $this->model = English::singularize(English::carmelCase($name));//ucfirst(strtolower(trim(preg_replace("/[^a-zA-Z0-9]/", "", $name))));
-        $this->fields = $fields;
+        $this->model    = English::entityName($name,TRUE);//ucfirst(strtolower(trim(preg_replace("/[^a-zA-Z0-9]/", "", $name))));
+        $this->fields   = $fields;
     }
-
-	/**
-	 * @return array|Tablefield[]
-	 */
-    public function getFields() {
+    
+    /**
+     * @return array|Tablefield[]
+     */
+    public function getFields()
+    {
         return $this->fields;
     }
 }
