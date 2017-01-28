@@ -28,7 +28,7 @@ class QueryBuilder
     
     public static $PARAMETERS = [];
     protected     $table;
-    private       $comparison = ['=', '>', '<', '>=', '<=', '<>', '!=', '<=>'];
+    protected     $comparison = ['=', '>', '<', '>=', '<=', '<>', '!=', '<=>', 'LIKE', 'NOT LIKE'];
     
     public function getTables() { return $this->PRIMARY_TABLES; }
     

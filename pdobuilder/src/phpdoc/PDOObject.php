@@ -35,12 +35,12 @@ use pdobuilder\statement\Update;
  * @method $this groupStart();
  * @method $this orGroupStart();
  * @method $this groupEnd();
- * @method $this orWhere($column, $values = NULL);
+ * @method $this orWhere($column, $values = NULL, $operator = '=');
  * @method $this orWhereNull($column);
  * @method $this orWhereNotNull($column);
  * @method $this orWhereIn($column, array $values = NULL);
  * @method $this orWhereNotIn($column, array $values = NULL);
- * @method $this where($column, $values = NULL);
+ * @method $this where($column, $values = NULL, $operator = '=');
  * @method $this whereNull($column);
  * @method $this whereNotNull($column);
  * @method $this whereIn($column, array $values = NULL);
@@ -81,7 +81,7 @@ class PDOObject
         $this->CLAUSE     = NULL;
         $this->last_query = $insert->getQuery();
         $this->PDO->query($insert->getRaw(), QueryBuilder::$PARAMETERS);
-        return $this->PDO->affectedRows();
+        return $this->PDO->lastInsertID();
     }
     
     public function delete($aliases = NULL)
@@ -154,4 +154,8 @@ class PDOObject
     }
     
     function lastQuery() { return $this->last_query; }
+    
+    public function errorCode() { return DBException::getCode(); }
+    
+    public function errorMessage() { return DBException::getMessage(); }
 }

@@ -29,18 +29,61 @@ class WhereClause extends QueryBuilder implements StatementClause
         return $this;
     }
     
-    public function where($column, $value = NULL)
+    public function where($column, $value = FALSE, $comparison = '=')
     {
-        if (is_array($column)) {
-            $column = array_filter($column, function ($c) { return (bool)trim($c); });
-            foreach ($column as $col => $item) {
-                $this->where($col, $item);
-            }
-            return $this;
-        }
-        if (NULL === $value || FALSE === $value) return $this->whereNull($column);
-        $this->addWhere($column, ' = ' . $this->valueBind($value));
+        $args = func_get_args();
+        array_unshift($args, FALSE);
+        call_user_func_array([$this, '_where'], $args);
         return $this;
+    }
+    
+    private function _where($isOr, $column, $value = FALSE, $comparison = '=')
+    {
+        if (is_array($column) || is_array($value)) {
+            call_user_func_array([$this, 'arrayWhere'], func_get_args());
+            return;
+        }
+        $comparison = in_array(trim(strtoupper($comparison)), $this->comparison) ? strtoupper(trim($comparison)) : '=';
+        if (is_null($value)) {
+            if ($isOr) $this->orWhereNull($column); else $this->whereNull($column);
+        } else {
+            if (0 == strcasecmp($comparison, 'like') || 0 == strcasecmp($comparison, 'not like')) {
+                $value = '%' . $value . '%';
+            }
+            $this->addWhere($column, $comparison . ' ' . $this->valueBind($value), $isOr);
+        }
+    }
+    
+    private function arrayWhere($isOR, $column, $value = FALSE, $comparison = '=')
+    {
+        $args = func_get_args();
+        if (is_array($column) && 2 == count($args)) {
+            foreach ($column as $col => $val) {
+                if (is_string($col)) {
+                    if ($isOR) $this->orWhere($col, $val); else $this->where($col, $val);
+                } elseif (is_array($val) && 3 == count($val)) {
+                    $val = array_values($val);
+                    if ($isOR) $this->orWhere($val[0], $val[1], $val[2]); else $this->where($val[0], $val[1], $val[2]);
+                }
+            }
+        } elseif (is_array($column) && 3 <= count($args) && (is_string($value) || is_numeric($value))) {
+            $comparison = strtolower(trim($comparison));
+            if (0 == strcasecmp($comparison, 'like') || 0 == strcasecmp($comparison, 'not like')) {
+                $column = 'CONCAT(' . implode(', ', array_filter($column, function ($c) { return is_string($c); })) . ')';
+                $value  = ((0 == strcasecmp($comparison, 'like')) ? 'LIKE' : 'NOT LIKE') . ' ' . $this->valueBind('%' . $value . '%');
+                $this->addWhere($column, $value, $isOR);
+            } else {
+                $this->addWhere($this->valueBind($value), 'IN (' . implode(', ', $column) . ')', $isOR);
+            }
+        } elseif (is_array($value) && is_string($column)) {
+            $value = array_filter($value, function ($v) { return is_string($v) || is_numeric($v); });
+            if (0 == strcasecmp($comparison, 'like') || 0 == strcasecmp($comparison, 'not like')) {
+                $value = ((0 == strcasecmp($comparison, 'like')) ? 'REGEXP' : 'NOT REGEXP') . ' ' . $this->valueBind(implode('|', $value));
+            } else {
+                $value = 'IN (' . implode(', ', array_map(function ($v) { return $this->valueBind($v); }, $value)) . ')';
+            }
+            $this->addWhere($column, $value);
+        }
     }
     
     public function whereNull($column)
@@ -71,17 +114,11 @@ class WhereClause extends QueryBuilder implements StatementClause
         return $this;
     }
     
-    public function orWhere($column, $value = NULL)
+    public function orWhere($column, $value = FALSE, $comparison = '=')
     {
-        if (is_array($column)) {
-            $column = array_filter($column, function ($c) { return (bool)trim($c); });
-            foreach ($column as $col => $item) {
-                $this->where($col, $item);
-            }
-            return $this;
-        }
-        if (NULL === $value || FALSE === $value) return $this->whereNull($column);
-        $this->addWhere($column, ' = ' . $this->valueBind($value), TRUE);
+        $args = func_get_args();
+        array_unshift($args, TRUE);
+        call_user_func_array([$this, '_where'], $args);
         return $this;
     }
     
@@ -121,7 +158,12 @@ class WhereClause extends QueryBuilder implements StatementClause
     
     private function addWhere($column, $condition, $isOR = FALSE)
     {
-        $this->WHERE[] = [$isOR ? 'OR' : 'AND', $this->whereColumn($column) . $condition];
+        $this->WHERE[] = [$isOR ? 'OR' : 'AND', $this->whereColumn($column) . ' ' . $condition];
+    }
+    
+    public function like($column, $value)
+    {
+        $args = func_get_args();
     }
     
     public function getClause()
@@ -135,7 +177,7 @@ class WhereClause extends QueryBuilder implements StatementClause
         $bracket = FALSE;
         foreach ($this->WHERE as $whereC) {
             if (!$bracket) {
-                $where .= ($where ? ' ' . $whereC[0].' ' : '');
+                $where .= ($where ? ' ' . $whereC[0] . ' ' : '');
             }
             $where .= $whereC[1];
             $bracket = '(' == $whereC[1];

@@ -19,9 +19,9 @@ class PhpPdo
     /** @var \PDOStatement null */
     private $STMT  = NULL;
     private $class = '';
-    
-    private $_selectRows   = [];
-    private $_selectCursor = -1;
+    public  $message;
+    public  $code;
+    private $error;
     
     public function __construct(array $connection)
     {
@@ -33,10 +33,18 @@ class PhpPdo
         $d[] = @$connection['port'] ? 'port=' . $connection['port'] : '';
         $d[] = @$connection['unix_socket'] ? 'unix_socket=' . $connection['unix_socket'] : '';
         $dsn .= implode(';', array_filter($d));
+        $this->error = new DBException();
+        $this->error->clear();
         
         $this->id = md5($dsn . $connection['username'] . $connection['password']);
-        if (!isset(self::$PDOs[$this->id]))
-            self::$PDOs[$this->id] = new \PDO($dsn, $connection['username'], $connection['password'], [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,]);
+        try {
+            if (!isset(self::$PDOs[$this->id]))
+                self::$PDOs[$this->id] = new \PDO($dsn, $connection['username'], $connection['password'], [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,]);
+        } catch (\PDOException $PDOBException) {
+            $this->error->setException($PDOBException);
+        } catch (\PDOBException $exception) {
+            $this->error->setException($exception);
+        }
     }
     
     private function preparedBinds($stmt, array $binds)
@@ -52,41 +60,91 @@ class PhpPdo
     
     private function bind(array $binds)
     {
-        foreach ($binds as $bind => $value) {
-            if (is_int($value)) {
-                $this->STMT->bindValue($bind, $value, \PDO::PARAM_INT);
-            } elseif (NULL === $value) {
-                $this->STMT->bindValue($bind, $value, \PDO::PARAM_NULL);
-            } elseif (FALSE === $value || TRUE === $value) {
-                $this->STMT->bindValue($bind, $value, \PDO::PARAM_BOOL);
-            } else $this->STMT->bindValue($bind, $value);
+        try {
+            foreach ($binds as $bind => $value) {
+                if (is_int($value)) {
+                    $this->STMT->bindValue($bind, $value, \PDO::PARAM_INT);
+                } elseif (NULL === $value) {
+                    $this->STMT->bindValue($bind, $value, \PDO::PARAM_NULL);
+                } elseif (FALSE === $value || TRUE === $value) {
+                    $this->STMT->bindValue($bind, $value, \PDO::PARAM_BOOL);
+                } else $this->STMT->bindValue($bind, $value);
+            }
+        } catch (\PDOException $PDOBException) {
+            $this->error->setException($PDOBException);
+        } catch (\PDOBException $exception) {
+            $this->error->setException($exception);
         }
     }
     
-    public function affectedRows() { return $this->STMT->rowCount(); }
+    public function affectedRows()
+    {
+        try {
+            return $this->STMT->rowCount();
+        } catch (\PDOException $PDOBException) {
+            $this->error->setException($PDOBException);
+        } catch (\PDOBException $exception) {
+            $this->error->setException($exception);
+        }
+        return 0;
+    }
     
-    public function lastInsertID() { return self::$PDOs[$this->id]->lastInsertId(); }
+    public function lastInsertID()
+    {
+        try {
+            return self::$PDOs[$this->id]->lastInsertId();
+        } catch (\PDOException $PDOBException) {
+            $this->error->setException($PDOBException);
+        } catch (\PDOBException $exception) {
+            $this->error->setException($exception);
+        }
+        return NULL;
+    }
     
     public function query($sqlQuery, array $parameters = [], $className = '')
     {
-        $this->class = '';
-        $this->STMT  = self::$PDOs[$this->id]->prepare($sqlQuery);
-        if ($className = trim($className)) {
-            if (!class_exists($className)) {
-                $className = 'stdClass';
+        $this->error->clear();
+        try {
+            $this->class = '';
+            $this->STMT  = self::$PDOs[$this->id]->prepare($sqlQuery);
+            if ($className = trim($className)) {
+                if (!class_exists($className)) {
+                    $className = 'stdClass';
+                }
+                $this->STMT->setFetchMode(\PDO::FETCH_CLASS, $className);
+                $this->class = $className;
             }
-            $this->STMT->setFetchMode(\PDO::FETCH_CLASS, $className);
-            $this->class = $className;
+            $this->bind($this->preparedBinds($sqlQuery, $parameters));
+            $this->STMT->execute();
+        } catch (\PDOException $PDOBException) {
+            $this->error->setException($PDOBException);
+        } catch (\PDOBException $exception) {
+            $this->error->setException($exception);
         }
-        $this->bind($this->preparedBinds($sqlQuery, $parameters));
-        $this->STMT->execute();
     }
     
-    public function countCols() { return $this->STMT->columnCount(); }
+    public function countCols()
+    {
+        try {
+            return $this->STMT->columnCount();
+        } catch (\PDOException $PDOBException) {
+            $this->error->setException($PDOBException);
+        } catch (\PDOBException $exception) {
+            $this->error->setException($exception);
+        }
+        return NULL;
+    }
     
     public function rows()
     {
-        if ($this->class) return new StatementData($this->STMT->fetchAll(\PDO::FETCH_CLASS, $this->class));
-        return new StatementData($this->STMT->fetchAll(\PDO::FETCH_ASSOC));
+        try {
+            if ($this->class) return new StatementData($this->STMT->fetchAll(\PDO::FETCH_CLASS, $this->class));
+            return new StatementData($this->STMT->fetchAll(\PDO::FETCH_ASSOC));
+        } catch (\PDOException $PDOBException) {
+            $this->error->setException($PDOBException);
+        } catch (\PDOBException $exception) {
+            $this->error->setException($exception);
+        }
+        return NULL;
     }
 }

@@ -8,6 +8,7 @@
 
 namespace Database;
 
+use pdobuilder\DBException;
 use pdobuilder\PdoBuilder;
 use pdobuilder\statement\StatementData;
 
@@ -214,8 +215,28 @@ abstract class DbActive
         return $this->PDOBuild->columnValue($updates)->where($conditions)->update(static::TABLE_NAME);
     }
     
+    /**
+     * @param null $pk
+     *
+     * @return static
+     */
     public static function model($pk = NULL)
     {
         return new static($pk);
     }
+    
+    public function errorCode()
+    {
+        return $this->PDOBuild->errorCode();
+    }
+    
+    public function errorMessage()
+    {
+        return $this->PDOBuild->errorMessage();
+    }
+    
+    /**
+     * @return PdoBuilder
+     */
+    public function asTable() { return $this->PDOBuild->table(static::TABLE_NAME); }
 }
