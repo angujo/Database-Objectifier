@@ -124,13 +124,13 @@ class Model
         $str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
             '@param int $limit' . PHP_EOL . Configuration::TAB . ' * ' .
             '@param int $offset' . PHP_EOL . Configuration::TAB . ' * ' .
-            '@return ' . $tblModel . '[]' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
+            '@return ' . $tblModel . '[]|StatementData[]' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
             'function get' . English::entityName($tblModel,FALSE) . '($limit = NULL, $offset = 0){' .
             //PHP_EOL . Configuration::TAB(2) . 'if(!$this->' . $origRef->referenced_column . ') return [];' .
             PHP_EOL . Configuration::TAB(2) . 'if(!is_null($limit) && is_numeric($limit)) $this->PDOBuild->limit((int)$limit, (int)$offset);' .
             PHP_EOL . Configuration::TAB(2) . '$this->PDOBuild' . implode(PHP_EOL . Configuration::TAB(3), array_reverse($joins)) . ';' . PHP_EOL .
             Configuration::TAB(2) . '$this->PDOBuild->select(\'' . $this->alias($reference->table) . '.*\');' .
-            PHP_EOL . Configuration::TAB(2) . '/** @var ' . $tblModel . '[] $_e */' .
+            PHP_EOL . Configuration::TAB(2) . '/** @var ' . $tblModel . '[]|StatementData[] $_e */' .
             PHP_EOL . Configuration::TAB(2) . '$_e = $this->PDOBuild->table(\'' . $reference->table . '\', \'' . $this->alias($reference->table) .
             '\')->getAll(\'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel . '\');' . PHP_EOL .
             Configuration::TAB(2) . 'return $_e;' . PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
