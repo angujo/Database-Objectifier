@@ -1,6 +1,7 @@
 <?php
 error_reporting(E_ALL & ~E_WARNING);
 require_once 'factory/Model.php';
+require_once 'factory/English.php';
 require_once 'factory/Extension.php';
 require_once 'factory/Table.php';
 require_once 'factory/Tablefield.php';

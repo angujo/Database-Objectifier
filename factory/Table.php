@@ -29,7 +29,7 @@ class Table {
     public function __construct($name = '', array $fields = array(), $type = '') {
         $this->name = $name;
         $this->typeView = 'view' == trim(strtolower($type));
-        $this->model = ucfirst(strtolower(trim(preg_replace("/[^a-zA-Z0-9]/", "", $name))));
+        $this->model = English::singularize(English::carmelCase($name));//ucfirst(strtolower(trim(preg_replace("/[^a-zA-Z0-9]/", "", $name))));
         $this->fields = $fields;
     }
 

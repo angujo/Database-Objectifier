@@ -30,10 +30,14 @@ class Model
         $this->createConstructor();
         //$this->createSetters();
         //$this->createGetters();
-        foreach ($references as $field) {
+        foreach ($references['bottom'] as $field) {
             if (!trim($field->table)) continue;
-            $this->createGet($field);
+            $this->createBottomGet($field);
             $this->createCount($field);
+        }
+        foreach ($references['top'] as $field) {
+            if (!trim($field->table)) continue;
+            $this->createTopGet($field);
         }
         $this->closeModel();
     }
@@ -72,7 +76,7 @@ class Model
     
     private function createCount($reference, $joins = [])
     {
-        $tblModel = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
+        $tblModel = English::carmelCase($reference->table);// ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
         if (isset($this->functions['cnt' . $tblModel])) return;
         $this->functions['cnt' . $tblModel] = TRUE;
         if (empty($joins)) {
@@ -86,7 +90,7 @@ class Model
         }
         $str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
             '@return int' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
-            'function count' . $tblModel . '(){' .
+            'function count' . English::pluralize($tblModel) . '(){' .
             PHP_EOL . Configuration::TAB(2) . 'if(!$this->' . $reference->referenced_column . ') return 0;' .
             PHP_EOL . Configuration::TAB(2) . '$this->PDOBuild' . implode(PHP_EOL . Configuration::TAB(3), array_reverse($joins)) . ';' . PHP_EOL .
             Configuration::TAB(2) . 'return $this->PDOBuild->table(\'' . $reference->table . '\',\'' . $this->alias($reference->table) . '\')->count();' .
@@ -100,9 +104,9 @@ class Model
         }
     }
     
-    private function createGet($reference, $joins = [])
+    private function createBottomGet($reference, $joins = [])
     {
-        $tblModel = ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
+        $tblModel = English::singularize(English::carmelCase($reference->table));// ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->table)));
         if (isset($this->functions[$tblModel])) return;
         $this->functions[$tblModel] = TRUE;
         if (empty($joins)) {
@@ -118,20 +122,52 @@ class Model
             '@param int $limit' . PHP_EOL . Configuration::TAB . ' * ' .
             '@param int $offset' . PHP_EOL . Configuration::TAB . ' * ' .
             '@return ' . $tblModel . '[]' . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
-            'function get' . $tblModel . '($limit = NULL, $offset = 0){' .
+            'function get' . English::pluralize($tblModel) . '($limit = NULL, $offset = 0){' .
             PHP_EOL . Configuration::TAB(2) . 'if(!$this->' . $reference->referenced_column . ') return [];' .
             PHP_EOL . Configuration::TAB(2) . 'if(!is_null($limit) && is_numeric($limit)) $this->PDOBuild->limit((int)$limit, (int)$offset);' .
             PHP_EOL . Configuration::TAB(2) . '$this->PDOBuild' . implode(PHP_EOL . Configuration::TAB(3), array_reverse($joins)) . ';' . PHP_EOL .
             Configuration::TAB(2) . '$this->PDOBuild->select(\'' . $this->alias($reference->table) . '.*\');' .
             PHP_EOL . Configuration::TAB(2) . '/** @var ' . $tblModel . '[] $_e */' .
             PHP_EOL . Configuration::TAB(2) . '$_e = $this->PDOBuild->table(\'' . $reference->table . '\', \'' . $this->alias($reference->table) .
-            '\')->getAll(\'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel . '\');' . PHP_EOL.
-            Configuration::TAB(2) . 'return $_e;' . PHP_EOL . Configuration::TAB . '}' . PHP_EOL ;
+            '\')->getAll(\'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel . '\');' . PHP_EOL .
+            Configuration::TAB(2) . 'return $_e;' . PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
         $str = str_ireplace($this->alias($reference->table), 't_tbl', $str);
         $this->editModel($str);
         if (@$reference->children && is_array($reference->children)) {
             foreach ($reference->children as $childRef) {
-                $this->createGet($childRef, $joins);
+                $this->createBottomGet($childRef, $joins);
+            }
+        }
+    }
+    
+    private function createTopGet($reference, $joins = [])
+    {
+        $tblModel = English::singularize(English::carmelCase($reference->referenced_table));//ucfirst(strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $reference->referenced_table)));
+        if (isset($this->functions['tg' . $tblModel])) return;
+        $this->functions['tg' . $tblModel] = TRUE;
+        if (empty($joins)) {
+            $joins[] = '->where(\'' . $this->alias($reference->referenced_table) . '.' . $reference->referenced_column . '\', ' .
+                '(int)$this->' . $reference->column . ')';
+        } else {
+            $joins[$reference->table] =
+                '->joinInner(\'' . $reference->table . ' ' . $this->alias($reference->table) . '\', \'' .
+                $this->alias($reference->table) . '.' . $reference->column . ' = ' . $this->alias($reference->referenced_table) .
+                '.' . $reference->referenced_column . '\')';
+        }
+        $str = Configuration::TAB . '/**' . PHP_EOL . Configuration::TAB . ' * ' .
+            '@return ' . $tblModel . PHP_EOL . Configuration::TAB . ' */' . PHP_EOL . Configuration::TAB .
+            'function get' . English::singularize($tblModel) . '(){' .
+            PHP_EOL . Configuration::TAB(2) . 'if(!$this->' . $reference->column . ') return NULL;' .
+            PHP_EOL . Configuration::TAB(2) . '$this->PDOBuild->limit(1)' . implode(PHP_EOL . Configuration::TAB(3), array_reverse($joins)) . ';' . PHP_EOL .
+            PHP_EOL . Configuration::TAB(2) . '/** @var ' . $tblModel . ' $_e */' .
+            PHP_EOL . Configuration::TAB(2) . '$_e = $this->PDOBuild->select(\'' . $this->alias($reference->referenced_table) . '.*\')' . '->table(\'' . $reference->referenced_table . '\', \'' . $this->alias($reference->referenced_table) .
+            '\')->getOne(\'\Database\\' . Configuration::dbNamespace() . '\\' . $tblModel . '\');' . PHP_EOL .
+            Configuration::TAB(2) . 'return $_e;' . PHP_EOL . Configuration::TAB . '}' . PHP_EOL;
+        $str = str_ireplace($this->alias($reference->referenced_table), 't_tbl', $str);
+        $this->editModel($str);
+        if (@$reference->children && is_array($reference->children)) {
+            foreach ($reference->children as $childRef) {
+                $this->createBottomGet($childRef, $joins);
             }
         }
     }
@@ -163,7 +199,7 @@ class Model
     private function createConstructor()
     {
         //We will inherit the parent's constructor
-       $str = Configuration::TAB . ' /* function __construct($conditions=FALSE){' . PHP_EOL . Configuration::TAB(2) .
+        $str = Configuration::TAB . ' /* function __construct($conditions=FALSE){' . PHP_EOL . Configuration::TAB(2) .
             'parent::__construct($conditions);' . PHP_EOL .
             Configuration::TAB . '} */' . PHP_EOL;
         $this->editModel($str);
