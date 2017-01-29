@@ -16,7 +16,7 @@ class Configuration
 
 	static $MODELS_DIRECTORY = 'models' . DIRECTORY_SEPARATOR;
 	static $DB_USERNAME      = 'root';
-	static $DB_NAME          = 'monitore_org';
+	static $DB_NAME          = 'dev';
 	static $DB_PASS          = 'root';
 	static $DB_HOST          = 'localhost';
 	static $DB_SERVER        = 'mysql';

@@ -32,7 +32,10 @@ abstract class DbActive
         $connections           = $connections['setting'];
         $connections['dbname'] = static::DB_NAME;
         $this->PDOBuild        = new PdoBuilder($connections);
-        $this->init($conditions);
+        if ($conditions) {
+            $this->init($conditions, FALSE, TRUE);
+            $this->init($det = $this->PDOBuild->getOne());
+        }
     }
     
     public function lastQuery() { return $this->PDOBuild->lastQuery(); }
