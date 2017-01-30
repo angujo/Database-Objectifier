@@ -28,13 +28,13 @@ abstract class DbActive
     
     public function __construct($conditions = NULL)
     {
-        $connections           = include dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'pdobuilder' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'conf.php';
+        $connections           = include dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'conf.php';
         $connections           = $connections['setting'];
         $connections['dbname'] = static::DB_NAME;
         $this->PDOBuild        = new PdoBuilder($connections);
         if ($conditions) {
             $this->init($conditions, FALSE, TRUE);
-            $this->init($det = $this->PDOBuild->getOne());
+            $this->init($det = $this->PDOBuild->table(static::TABLE_NAME)->getOne());
         }
     }
     
@@ -53,24 +53,22 @@ abstract class DbActive
      */
     public function init($details, $append = TRUE, $DBLoad = FALSE, $exclusive = FALSE)
     {
-        $details = is_array($details) ? array_filter($details) : $details;
         if ($details) {
-            if (!is_array($details)) {
-                $details = ['id' => (int)$details];
-            }
-        }
-        if (is_array($details) && $details) {
-            $v    = get_object_vars($this);
-            $vars = array_intersect_key($details, $v);
-            if (TRUE !== $append) {
-                foreach ($v as $var => $val) {
-                    if (in_array(strtolower(trim($var)), self::$ignoreVars)) continue;
-                    $this->$var = NULL;
+            if (is_array($details)) {
+                $v    = get_object_vars($this);
+                $vars = array_intersect_key($details, $v);
+                if (TRUE !== $append) {
+                    foreach ($v as $var => $val) {
+                        if (in_array(strtolower(trim($var)), self::$ignoreVars)) continue;
+                        $this->$var = NULL;
+                    }
                 }
-            }
-            foreach ($vars as $property => $val) {
-                if (in_array(strtolower(trim($property)), self::$ignoreVars)) continue;
-                $this->{$property} = $val;
+                foreach ($vars as $property => $val) {
+                    if (in_array(strtolower(trim($property)), self::$ignoreVars)) continue;
+                    $this->{$property} = $val;
+                }
+            } else {
+                $details = ['id' => (int)$details];
             }
         }
         if (TRUE === $DBLoad) {
@@ -123,7 +121,7 @@ abstract class DbActive
      */
     public function one($conditions = NULL)
     {
-        $this->init($conditions, FALSE, TRUE);
+        $this->init($conditions, FALSE, TRUE, TRUE);
         /** @var array $d */
         $d = $this->PDOBuild->limit(1)->table(static::TABLE_NAME)->getOne();
         $this->init($d, FALSE);
@@ -201,9 +199,20 @@ abstract class DbActive
      */
     public function update($conditions = NULL)
     {
-        if (!isset($this->id) || !$this->id || !$this->one($conditions)) return 0;
-        $this->init($conditions, TRUE, TRUE);
-        return $this->PDOBuild->table(static::TABLE_NAME)->update();
+        if (!isset($this->id) || !$this->id) return 0;
+        $vars    = get_object_vars($this);
+        $details = [];
+        foreach ($vars as $var => $val) {
+            if (in_array(strtolower($var), self::$ignoreVars) || (is_null($val) && !isset($conditions[$var]))) continue;
+            $details[$var] = isset($conditions[$var]) ? $conditions[$var] : $val;
+        }
+        if ($res = $this->PDOBuild->where('id', $this->id)->table(static::TABLE_NAME)->update($details)) {
+            foreach ($details as $var => $val) {
+                if (!trim($var) || !isset($this->{$var})) continue;
+                $this->{$var} = $val;
+            }
+        }
+        return $res;
     }
     
     /**
